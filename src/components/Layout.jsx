@@ -1,0 +1,99 @@
+import React from 'react';
+import { useVote } from '../context/VoteContext';
+import { Shield, LogOut, LayoutDashboard, FileText, BarChart3, Users } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+
+const Layout = ({ children }) => {
+    const { currentUser, logout } = useVote();
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    const handleLogout = () => {
+        logout();
+        navigate('/');
+    };
+
+    const isPublicPage = location.pathname === '/' || location.pathname === '/leaderboard';
+    const isVoterPage = location.pathname.startsWith('/voter');
+
+    // Simple Navbar for public/voter pages
+    if (isPublicPage || isVoterPage) {
+        return (
+            <div className="min-h-screen flex flex-col bg-slate-50">
+                <header className="bg-navy-900 text-white shadow-lg sticky top-0 z-50">
+                    <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+                        <Link to="/" className="flex items-center space-x-2">
+                            <Shield className="h-8 w-8 text-accent-blue" />
+                            <span className="text-xl font-bold tracking-tight">E-VotePro</span>
+                        </Link>
+                        <nav className="flex items-center space-x-6">
+                            <Link to="/leaderboard" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">Live Results</Link>
+                            {currentUser ? (
+                                <button onClick={handleLogout} className="flex items-center space-x-1 text-slate-300 hover:text-white text-sm font-medium">
+                                    <LogOut className="h-4 w-4" />
+                                    <span>Exit</span>
+                                </button>
+                            ) : (
+                                <Link to="/" className="text-slate-300 hover:text-white text-sm font-medium">Home</Link>
+                            )}
+                        </nav>
+                    </div>
+                </header>
+                <main className="flex-grow">
+                    {children}
+                </main>
+                <footer className="bg-navy-900 text-slate-400 py-6 mt-12 border-t border-navy-800">
+                    <div className="container mx-auto px-4 text-center text-sm">
+                        <p>&copy; {new Date().getFullYear()} E-VotePro. Secure Electronic Voting System.</p>
+                    </div>
+                </footer>
+            </div>
+        );
+    }
+
+    // Admin / Auditor Sidebar Layout
+    const navItems = [
+        { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, role: 'admin' },
+        { label: 'Audit Log', path: '/auditor', icon: FileText, role: 'auditor' },
+        { label: 'Live Results', path: '/leaderboard', icon: BarChart3, role: 'all' },
+    ];
+
+    return (
+        <div className="min-h-screen bg-slate-100 flex">
+            {/* Sidebar */}
+            <aside className="w-64 bg-navy-900 text-white fixed h-full shadow-xl">
+                <div className="p-6 border-b border-navy-800 flex items-center space-x-2">
+                    <Shield className="h-8 w-8 text-accent-blue" />
+                    <span className="text-xl font-bold">E-VotePro</span>
+                </div>
+                <nav className="mt-6 px-4 space-y-2">
+                    {navItems.filter(item => item.role === 'all' || item.role === currentUser?.role || currentUser?.role === 'admin').map((item) => (
+                        <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${location.pathname === item.path ? 'bg-accent-blue text-white' : 'text-slate-400 hover:bg-navy-800 hover:text-white'}`}
+                        >
+                            <item.icon className="h-5 w-5" />
+                            <span className="font-medium">{item.label}</span>
+                        </Link>
+                    ))}
+                </nav>
+                <div className="absolute bottom-0 w-full p-4 border-t border-navy-800">
+                    <button onClick={handleLogout} className="flex items-center space-x-3 text-slate-400 hover:text-white w-full px-4 py-2 hover:bg-navy-800 rounded-lg transition-colors">
+                        <LogOut className="h-5 w-5" />
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </aside>
+
+            {/* Main Content */}
+            <main className="flex-1 ml-64 p-8">
+                <div className="max-w-6xl mx-auto">
+                    {children}
+                </div>
+            </main>
+        </div>
+    );
+};
+
+export default Layout;
