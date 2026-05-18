@@ -132,6 +132,10 @@ export const VoteProvider = ({ children }) => {
         setCandidates([...candidates, { ...newCandidate, id, votes: 0 }]);
     };
 
+    const removeCandidate = (candidateId) => {
+        setCandidates(prev => prev.filter(c => c.id !== candidateId));
+    };
+
     return (
         <VoteContext.Provider value={{
             candidates,
@@ -143,7 +147,8 @@ export const VoteProvider = ({ children }) => {
             registerVoter,
             castVote,
             resetElection,
-            addCandidate
+            addCandidate,
+            removeCandidate
         }}>
             {children}
         </VoteContext.Provider>

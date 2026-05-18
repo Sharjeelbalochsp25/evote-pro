@@ -5,7 +5,7 @@ import { useVote } from '../context/VoteContext';
 
 const Landing = () => {
     const navigate = useNavigate();
-    const { login } = useVote();
+    const { loginVoter } = useVote();
     const [showAdminLogin, setShowAdminLogin] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -13,7 +13,7 @@ const Landing = () => {
 
     const handleAdminLogin = (e) => {
         e.preventDefault();
-        const result = login('admin', { username, password });
+        const result = loginVoter('admin', { username, password });
         if (result.success) {
             navigate('/admin');
         } else {
@@ -22,7 +22,7 @@ const Landing = () => {
     };
 
     const handleAuditorLogin = () => {
-        login('auditor');
+        loginVoter('auditor');
         navigate('/auditor');
     }
 

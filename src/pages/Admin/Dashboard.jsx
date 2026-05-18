@@ -3,7 +3,7 @@ import { useVote } from '../../context/VoteContext';
 import { Users, Trash2, RotateCcw, Plus, Award } from 'lucide-react';
 
 const AdminDashboard = () => {
-    const { candidates, voters, resetElection, addCandidate } = useVote();
+    const { candidates, voters, resetElection, addCandidate, removeCandidate } = useVote();
     const [newCandidate, setNewCandidate] = useState({ name: '', party: '' });
     const [isAdding, setIsAdding] = useState(false);
 
@@ -17,6 +17,13 @@ const AdminDashboard = () => {
             setNewCandidate({ name: '', party: '' });
             setIsAdding(false);
         }
+    };
+
+    const handleRemoveCandidate = (candidate) => {
+        if (!candidate) return;
+        const ok = window.confirm(`Remove candidate "${candidate.name}"?`);
+        if (!ok) return;
+        removeCandidate(candidate.id);
     };
 
     return (
@@ -118,21 +125,33 @@ const AdminDashboard = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {candidates.map((c) => (
-                            <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-6 py-4 font-mono text-slate-500">#{c.id.toString().padStart(3, '0')}</td>
-                                <td className="px-6 py-4 font-medium text-navy-900">{c.name}</td>
-                                <td className="px-6 py-4">
-                                    <span className="px-2 py-1 bg-blue-100 text-accent-blue rounded text-xs font-bold">{c.party}</span>
-                                </td>
-                                <td className="px-6 py-4 text-right font-bold text-navy-900">{c.votes}</td>
-                                <td className="px-6 py-4 text-right">
-                                    <button className="text-slate-400 hover:text-red-500 transition-colors">
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
+                        {candidates.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
+                                    No candidates yet. Use "Add Candidate" to create your first one.
                                 </td>
                             </tr>
-                        ))}
+                        ) : (
+                            candidates.map((c) => (
+                                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-6 py-4 font-mono text-slate-500">#{c.id.toString().padStart(3, '0')}</td>
+                                    <td className="px-6 py-4 font-medium text-navy-900">{c.name}</td>
+                                    <td className="px-6 py-4">
+                                        <span className="px-2 py-1 bg-blue-100 text-accent-blue rounded text-xs font-bold">{c.party}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-bold text-navy-900">{c.votes}</td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => handleRemoveCandidate(c)}
+                                            className="text-slate-400 hover:text-red-500 transition-colors"
+                                            title="Remove candidate"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
