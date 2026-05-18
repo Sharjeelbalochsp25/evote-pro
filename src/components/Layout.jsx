@@ -1,16 +1,18 @@
 import React from 'react';
 import { useVote } from '../context/VoteContext';
+import { useAuth } from '../context/AuthContext';
 import { Shield, LogOut, LayoutDashboard, FileText, BarChart3, Users } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const Layout = ({ children }) => {
-    const { currentUser, logout } = useVote();
+    const { currentVoter } = useVote();
+    const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
 
     const handleLogout = () => {
         logout();
-        navigate('/');
+        navigate('/login');
     };
 
     const isPublicPage = location.pathname === '/' || location.pathname === '/leaderboard';
@@ -28,7 +30,7 @@ const Layout = ({ children }) => {
                         </Link>
                         <nav className="flex items-center space-x-6">
                             <Link to="/leaderboard" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">Live Results</Link>
-                            {currentUser ? (
+                            {currentVoter ? (
                                 <button onClick={handleLogout} className="flex items-center space-x-1 text-slate-300 hover:text-white text-sm font-medium">
                                     <LogOut className="h-4 w-4" />
                                     <span>Exit</span>
@@ -67,7 +69,7 @@ const Layout = ({ children }) => {
                     <span className="text-xl font-bold">E-VotePro</span>
                 </div>
                 <nav className="mt-6 px-4 space-y-2">
-                    {navItems.filter(item => item.role === 'all' || item.role === currentUser?.role || currentUser?.role === 'admin').map((item) => (
+                    {navItems.filter(item => item.role === 'all' || item.role === currentVoter?.role || currentVoter?.role === 'admin').map((item) => (
                         <Link
                             key={item.path}
                             to={item.path}

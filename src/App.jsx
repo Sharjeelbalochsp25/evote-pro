@@ -7,46 +7,68 @@ import VotingBooth from './pages/Voter/VotingBooth';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AuditLog from './pages/Auditor/AuditLog';
 import Leaderboard from './pages/Candidate/Leaderboard';
+import Signup from './pages/Auth/Signup';
+import Login from './pages/Auth/Login';
 import { useVote } from './context/VoteContext';
+import { useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-    const { currentUser } = useVote();
+    const { currentVoter } = useVote();
 
-    if (!currentUser) return <Navigate to="/" replace />;
-    if (allowedRoles && !allowedRoles.includes(currentUser.role)) return <Navigate to="/" replace />;
+    if (!currentVoter) return <Navigate to="/" replace />;
+    if (allowedRoles && !allowedRoles.includes(currentVoter.role)) return <Navigate to="/" replace />;
 
     return children;
 };
 
-function App() {
+function AppContent() {
+    const { currentUser } = useAuth();
+
     return (
         <Router>
-            <Layout>
+            {!currentUser ? (
                 <Routes>
-                    <Route path="/" element={<Landing />} />
-                    <Route path="/leaderboard" element={<Leaderboard />} />
-
-                    <Route path="/voter/register" element={<VoterRegistration />} />
-                    <Route path="/voter/vote" element={
-                        <ProtectedRoute allowedRoles={['voter']}>
-                            <VotingBooth />
-                        </ProtectedRoute>
-                    } />
-
-                    <Route path="/admin" element={
-                        <ProtectedRoute allowedRoles={['admin']}>
-                            <AdminDashboard />
-                        </ProtectedRoute>
-                    } />
-
-                    <Route path="/auditor" element={
-                        <ProtectedRoute allowedRoles={['auditor', 'admin']}>
-                            <AuditLog />
-                        </ProtectedRoute>
-                    } />
+                    <Route path="/signup" element={<Signup />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
-            </Layout>
+            ) : (
+                <Layout>
+                    <Routes>
+                        <Route path="/" element={<Landing />} />
+                        <Route path="/leaderboard" element={<Leaderboard />} />
+
+                        <Route path="/voter/register" element={<VoterRegistration />} />
+                        <Route path="/voter/vote" element={
+                            <ProtectedRoute allowedRoles={['voter']}>
+                                <VotingBooth />
+                            </ProtectedRoute>
+                        } />
+
+                        <Route path="/admin" element={
+                            <ProtectedRoute allowedRoles={['admin']}>
+                                <AdminDashboard />
+                            </ProtectedRoute>
+                        } />
+
+                        <Route path="/auditor" element={
+                            <ProtectedRoute allowedRoles={['auditor', 'admin']}>
+                                <AuditLog />
+                            </ProtectedRoute>
+                        } />
+                    </Routes>
+                </Layout>
+            )}
         </Router>
+    );
+}
+
+function App() {
+    return (
+        <AuthProvider>
+            <AppContent />
+        </AuthProvider>
     );
 }
 
