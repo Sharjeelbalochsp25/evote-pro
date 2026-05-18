@@ -2,9 +2,9 @@ import React from 'react';
 import { useVote } from '../context/VoteContext';
 import { useAuth } from '../context/AuthContext';
 import { Shield, LogOut, LayoutDashboard, FileText, BarChart3, Users } from 'lucide-react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 
-const Layout = ({ children }) => {
+const Layout = () => {
     const { currentVoter } = useVote();
     const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
@@ -42,7 +42,7 @@ const Layout = ({ children }) => {
                     </div>
                 </header>
                 <main className="flex-grow">
-                    {children}
+                    <Outlet />
                 </main>
                 <footer className="bg-navy-900 text-slate-400 py-6 mt-12 border-t border-navy-800">
                     <div className="container mx-auto px-4 text-center text-sm">
@@ -91,7 +91,7 @@ const Layout = ({ children }) => {
             {/* Main Content */}
             <main className="flex-1 ml-64 p-8">
                 <div className="max-w-6xl mx-auto">
-                    {children}
+                    <Outlet />
                 </div>
             </main>
         </div>

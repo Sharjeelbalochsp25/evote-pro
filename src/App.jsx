@@ -26,48 +26,47 @@ function AppContent() {
     const { currentUser } = useAuth();
 
     return (
-        <Router>
+        <Routes>
             {!currentUser ? (
-                <Routes>
+                <>
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="*" element={<Navigate to="/login" replace />} />
-                </Routes>
+                </>
             ) : (
-                <Layout>
-                    <Routes>
+                <>
+                    <Route element={<Layout />}>
                         <Route path="/" element={<Landing />} />
                         <Route path="/leaderboard" element={<Leaderboard />} />
-
                         <Route path="/voter/register" element={<VoterRegistration />} />
                         <Route path="/voter/vote" element={
                             <ProtectedRoute allowedRoles={['voter']}>
                                 <VotingBooth />
                             </ProtectedRoute>
                         } />
-
                         <Route path="/admin" element={
                             <ProtectedRoute allowedRoles={['admin']}>
                                 <AdminDashboard />
                             </ProtectedRoute>
                         } />
-
                         <Route path="/auditor" element={
                             <ProtectedRoute allowedRoles={['auditor', 'admin']}>
                                 <AuditLog />
                             </ProtectedRoute>
                         } />
-                    </Routes>
-                </Layout>
+                    </Route>
+                </>
             )}
-        </Router>
+        </Routes>
     );
 }
 
 function App() {
     return (
         <AuthProvider>
-            <AppContent />
+            <Router>
+                <AppContent />
+            </Router>
         </AuthProvider>
     );
 }
