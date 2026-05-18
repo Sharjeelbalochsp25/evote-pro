@@ -9,7 +9,7 @@ import AuditLog from './pages/Auditor/AuditLog';
 import Leaderboard from './pages/Candidate/Leaderboard';
 import Signup from './pages/Auth/Signup';
 import Login from './pages/Auth/Login';
-import { useVote } from './context/VoteContext';
+import { useVote, VoteProvider } from './context/VoteContext';
 import { useAuth } from './context/AuthContext';
 import { AuthProvider } from './context/AuthContext';
 
