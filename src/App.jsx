@@ -64,9 +64,11 @@ function AppContent() {
 function App() {
     return (
         <AuthProvider>
-            <Router>
-                <AppContent />
-            </Router>
+            <VoteProvider>
+                <Router>
+                    <AppContent />
+                </Router>
+            </VoteProvider>
         </AuthProvider>
     );
 }
