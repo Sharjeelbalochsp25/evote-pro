@@ -18,7 +18,7 @@ const VoterRegistration = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.name || !formData.cnic || !formData.age) {
             setError("All fields are required.");
@@ -28,7 +28,7 @@ const VoterRegistration = () => {
         // Convert generic CNIC input to proper format if user forgot dashes? 
         // For now, assume user inputs correctly or simple validation handles it.
 
-        const result = registerVoter(formData);
+        const result = await registerVoter(formData);
         if (result.success) {
             navigate('/voter/vote');
         } else {

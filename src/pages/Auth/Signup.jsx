@@ -1,37 +1,36 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 const Signup = () => {
     const { signup } = useAuth();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        setSuccess('');
 
         if (formData.password !== formData.confirmPassword) {
             setError('Passwords do not match');
             return;
         }
 
-        const result = signup(formData.email, formData.password, formData.name);
-        if (result.success) {
-            setSuccess('Account created successfully! Redirecting...');
-            setTimeout(() => navigate('/'), 2000);
-        } else {
-            setError(result.error);
-        }
+        setIsSubmitting(true);
+
+        const result = await signup(formData.email, formData.password, formData.name);
+        if (result.success) navigate('/');
+        else setError(result.error);
+
+        setIsSubmitting(false);
     };
 
     return (
@@ -47,13 +46,6 @@ const Signup = () => {
                         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
                             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                             <p className="text-red-700 text-sm font-medium">{error}</p>
-                        </div>
-                    )}
-
-                    {success && (
-                        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start space-x-3">
-                            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-green-700 text-sm font-medium">{success}</p>
                         </div>
                     )}
 
@@ -109,6 +101,7 @@ const Signup = () => {
 
                         <button
                             type="submit"
+                            disabled={isSubmitting}
                             className="w-full py-3 bg-accent-blue text-white rounded-lg font-bold hover:bg-blue-600 transition-colors"
                         >
                             Create Account

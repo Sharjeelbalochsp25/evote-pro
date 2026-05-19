@@ -51,4 +51,7 @@ Since the files were generated manually, you first need to install the project d
 5. Click **Deploy site**.
 
 ## Notes
-- **Data Persistence**: This prototype uses `localStorage` to simulate a backend. Data will persist on the same device/browser but won't be shared across different users. To make this a real production app, you will need to connect the `VoteContext` to your C++ Backend API.
+- **Data Persistence**:
+   - If you configure Firebase (Auth + Firestore) via `VITE_FIREBASE_*` env vars, election data is stored in Firestore and is available across devices.
+   - If Firebase env vars are missing, the app intentionally falls back to `localStorage` (single-browser demo mode).
+   - For Vercel/Netlify deployments, add the same `VITE_FIREBASE_*` variables from `.env.example` in your hosting provider's Environment Variables settings.

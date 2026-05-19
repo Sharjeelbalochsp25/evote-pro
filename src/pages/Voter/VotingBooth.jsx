@@ -9,9 +9,9 @@ const VotingBooth = () => {
     const [voteSuccess, setVoteSuccess] = useState(null); // { transactionId: '...' }
     const navigate = useNavigate();
 
-    const handleVote = () => {
+    const handleVote = async () => {
         if (!selectedCandidate) return;
-        const result = castVote(selectedCandidate);
+        const result = await castVote(selectedCandidate);
         if (result && result.success) {
             setVoteSuccess(result);
         }

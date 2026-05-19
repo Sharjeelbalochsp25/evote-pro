@@ -10,20 +10,20 @@ const AdminDashboard = () => {
     const totalVotes = candidates.reduce((acc, curr) => acc + curr.votes, 0);
     const leadingCandidate = [...candidates].sort((a, b) => b.votes - a.votes)[0];
 
-    const handleAddCandidate = (e) => {
+    const handleAddCandidate = async (e) => {
         e.preventDefault();
         if (newCandidate.name && newCandidate.party) {
-            addCandidate(newCandidate);
+            await addCandidate(newCandidate);
             setNewCandidate({ name: '', party: '' });
             setIsAdding(false);
         }
     };
 
-    const handleRemoveCandidate = (candidate) => {
+    const handleRemoveCandidate = async (candidate) => {
         if (!candidate) return;
         const ok = window.confirm(`Remove candidate "${candidate.name}"?`);
         if (!ok) return;
-        removeCandidate(candidate.id);
+        await removeCandidate(candidate.id);
     };
 
     return (
@@ -34,9 +34,9 @@ const AdminDashboard = () => {
                     <p className="text-slate-500">Manage candidates and monitor election status.</p>
                 </div>
                 <button
-                    onClick={() => {
+                    onClick={async () => {
                         if (window.confirm("Are you sure you want to reset the entire election? This cannot be undone.")) {
-                            resetElection();
+                            await resetElection();
                         }
                     }}
                     className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 flex items-center space-x-2 text-sm font-medium"

@@ -23,7 +23,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 
 function AppContent() {
-    const { currentUser } = useAuth();
+    const { currentUser, authLoading } = useAuth();
+
+    if (authLoading) return null;
 
     return (
         <Routes>
@@ -55,6 +57,9 @@ function AppContent() {
                             </ProtectedRoute>
                         } />
                     </Route>
+                    <Route path="/login" element={<Navigate to="/" replace />} />
+                    <Route path="/signup" element={<Navigate to="/" replace />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </>
             )}
         </Routes>

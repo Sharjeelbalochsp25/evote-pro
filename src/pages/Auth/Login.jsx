@@ -8,22 +8,24 @@ const Login = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        const result = login(formData.email, formData.password);
-        if (result.success) {
-            navigate('/');
-        } else {
-            setError(result.error);
-        }
+        setIsSubmitting(true);
+
+        const result = await login(formData.email, formData.password);
+        if (result.success) navigate('/');
+        else setError(result.error);
+
+        setIsSubmitting(false);
     };
 
     return (
@@ -69,6 +71,7 @@ const Login = () => {
 
                         <button
                             type="submit"
+                            disabled={isSubmitting}
                             className="w-full py-3 bg-accent-blue text-white rounded-lg font-bold hover:bg-blue-600 transition-colors"
                         >
                             Log In
