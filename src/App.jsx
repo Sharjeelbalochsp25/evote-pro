@@ -31,9 +31,10 @@ function AppContent() {
         <Routes>
             {!currentUser ? (
                 <>
+                    <Route path="/" element={<Landing />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/login" element={<Login />} />
-                    <Route path="*" element={<Navigate to="/login" replace />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </>
             ) : (
                 <>
