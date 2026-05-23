@@ -8,3 +8,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <App />
     </React.StrictMode>,
 )
+
+// Build marker
+// This log helps confirm which build is deployed.
+/* eslint-disable no-console */
+console.log('E-VotePro build: 0.0.1')

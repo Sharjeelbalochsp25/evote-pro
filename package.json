@@ -1,17 +1,26 @@
 {
   "name": "evotepro",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:emulator": "vite --mode emulator",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "emulators:start": "npx firebase-tools emulators:start --project evotepro-7deff --only auth,firestore,functions",
+    "deploy:firebase": "npx firebase-tools deploy --only firestore:rules,hosting",
+    "deploy:firebase:full": "npx firebase-tools deploy --only firestore:rules,functions,hosting"
   },
   "dependencies": {
     "clsx": "^2.1.0",
+    "dotenv": "^17.4.2",
     "firebase": "^12.13.0",
+    "firebase-admin": "^13.10.0",
+    "firebase-functions": "^7.2.5",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -27,6 +36,7 @@
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "playwright": "^1.60.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.5"
