@@ -12,4 +12,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 // Build marker
 // This log helps confirm which build is deployed.
 /* eslint-disable no-console */
-console.log('E-VotePro build: 0.0.1')
+console.log('E-VotePro build: 0.0.2')
