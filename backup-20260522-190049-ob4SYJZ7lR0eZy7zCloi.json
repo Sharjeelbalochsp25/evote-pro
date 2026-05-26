@@ -1,0 +1,63 @@
+﻿{
+    "id":  "ob4SYJZ7lR0eZy7zCloi",
+    "election":  {
+                     "title":  "SmokeTest Election",
+                     "description":  "Created by smoke test",
+                     "creatorId":  "ZVXKvgBhfdpgLWDRIAwk3FvjplN4",
+                     "publicLink":  "ecfa05c9",
+                     "isActive":  true,
+                     "verification":  {
+                                          "method":  "CNIC",
+                                          "customLabel":  ""
+                                      },
+                     "createdAt":  {
+                                       "_seconds":  1779458384,
+                                       "_nanoseconds":  102000000
+                                   },
+                     "updatedAt":  {
+                                       "_seconds":  1779458384,
+                                       "_nanoseconds":  102000000
+                                   }
+                 },
+    "candidates":  [
+                       {
+                           "id":  "uVLYV03YwYdLpbwTtWlj",
+                           "name":  "Alice",
+                           "party":  "",
+                           "createdAt":  {
+                                             "_seconds":  1779458384,
+                                             "_nanoseconds":  132000000
+                                         },
+                           "votes":  1,
+                           "updatedAt":  {
+                                             "_seconds":  1779458384,
+                                             "_nanoseconds":  485000000
+                                         }
+                       }
+                   ],
+    "voters":  [
+                   {
+                       "id":  "12345-1234567-1",
+                       "identifier":  "12345-1234567-1",
+                       "name":  "Bob",
+                       "age":  30,
+                       "hasVoted":  true,
+                       "votedAt":  {
+                                       "_seconds":  1779458384,
+                                       "_nanoseconds":  487000000
+                                   }
+                   }
+               ],
+    "auditLog":  [
+                     {
+                         "id":  "a96aTGozfZ0xdxLR59H7",
+                         "voterHash":  "213d73291124641f",
+                         "candidateId":  "uVLYV03YwYdLpbwTtWlj",
+                         "electionId":  "ob4SYJZ7lR0eZy7zCloi",
+                         "timestamp":  {
+                                           "_seconds":  1779458384,
+                                           "_nanoseconds":  487000000
+                                       }
+                     }
+                 ]
+}

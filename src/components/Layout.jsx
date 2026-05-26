@@ -1,12 +1,12 @@
 import React from 'react';
-import { useVote } from '../context/VoteContext';
+import { useVote } from '../context/ElectionContext';
 import { useAuth } from '../context/AuthContext';
 import { Shield, LogOut, LayoutDashboard, FileText, BarChart3, Users } from 'lucide-react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 
 const Layout = () => {
-    const { currentVoter } = useVote();
-    const { currentUser, logout } = useAuth();
+    const { currentVoter, backendError } = useVote();
+    const { currentUser, logout, authError } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -41,6 +41,13 @@ const Layout = () => {
                         </nav>
                     </div>
                 </header>
+                {(authError || backendError) && (
+                    <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <div className="container mx-auto">
+                            <span className="font-semibold">System notice:</span> {authError || backendError}
+                        </div>
+                    </div>
+                )}
                 <main className="flex-grow">
                     <Outlet />
                 </main>
@@ -68,6 +75,12 @@ const Layout = () => {
                     <Shield className="h-8 w-8 text-accent-blue" />
                     <span className="text-xl font-bold">E-VotePro</span>
                 </div>
+                {(authError || backendError) && (
+                    <div className="mx-4 mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                        <p className="font-semibold">System notice</p>
+                        <p className="mt-1 text-amber-50/90">{authError || backendError}</p>
+                    </div>
+                )}
                 <nav className="mt-6 px-4 space-y-2">
                     {navItems.filter(item => item.role === 'all' || item.role === currentVoter?.role || currentVoter?.role === 'admin').map((item) => (
                         <Link

@@ -1,136 +1,93 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Shield, Lock, FileText, Vote, AlertCircle } from 'lucide-react';
-import { useVote } from '../context/VoteContext';
+import { ArrowRight, FileText, ShieldCheck, Vote } from 'lucide-react';
 
 const Landing = () => {
     const navigate = useNavigate();
-    const { loginVoter } = useVote();
-    const [showAdminLogin, setShowAdminLogin] = useState(false);
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-
-    const handleAdminLogin = (e) => {
-        e.preventDefault();
-        const result = loginVoter('admin', { username, password });
-        if (result.success) {
-            navigate('/admin');
-        } else {
-            setError(result.error);
-        }
-    };
-
-    const handleAuditorLogin = () => {
-        loginVoter('auditor');
-        navigate('/auditor');
-    }
 
     return (
-        <div className="min-h-[80vh] flex items-center justify-center p-4">
-            <div className="max-w-4xl w-full grid md:grid-cols-2 gap-8 items-center">
-
-                {/* Left: Hero Text */}
-                <div className="space-y-6">
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-navy-900 leading-tight">
-                        Secure Voting for a <span className="text-accent-blue">Digital Nation</span>.
-                    </h1>
-                    <p className="text-lg text-slate-600">
-                        E-VotePro is the next-generation electronic voting system ensuring transparency, security, and accessibility for every citizen.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 pt-4">
+        <div className="min-h-[80vh] px-4 py-10 sm:px-6 lg:px-8">
+            <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+                <section className="space-y-8">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-100">
+                        <ShieldCheck className="h-4 w-4" />
+                        Firebase-only voting on the free tier
+                    </div>
+                    <div className="space-y-4">
+                        <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
+                            Secure voting for a digital nation.
+                        </h1>
+                        <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
+                            Create elections, share public vote links, and record every ballot in Firestore without any external backend.
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row">
                         <button
-                            onClick={() => navigate('/voter/register')}
-                            className="px-8 py-3 bg-accent-blue text-white rounded-lg font-bold shadow-lg hover:bg-blue-600 transition-transform transform hover:-translate-y-1 flex items-center justify-center space-x-2"
+                            onClick={() => navigate('/join')}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-6 py-4 font-semibold text-slate-950 transition hover:bg-cyan-300"
                         >
                             <Vote className="h-5 w-5" />
-                            <span>Vote Now</span>
+                            Vote in Election
                         </button>
                         <button
-                            onClick={() => navigate('/leaderboard')}
-                            className="px-8 py-3 bg-white text-navy-900 border-2 border-slate-200 rounded-lg font-bold hover:border-accent-blue hover:text-accent-blue transition-colors flex items-center justify-center space-x-2"
+                            onClick={() => navigate('/creator/login')}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 font-semibold text-white transition hover:bg-white/10"
                         >
-                            <FileText className="h-5 w-5" />
-                            <span>View Results</span>
+                            Create Voting Booth
+                            <ArrowRight className="h-5 w-5" />
                         </button>
                     </div>
-                </div>
+                    <div className="grid gap-4 pt-4 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Firestore-backed elections</div>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Anonymous public voting</div>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">No external API layer</div>
+                    </div>
+                </section>
 
-                {/* Right: Login/Role Cards */}
-                <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-                    <h2 className="text-2xl font-bold text-navy-900 mb-6">Access Portal</h2>
-
-                    {!showAdminLogin ? (
-                        <div className="grid gap-4">
-                            <button onClick={() => navigate('/voter/register')} className="flex items-center p-4 border border-slate-200 rounded-xl hover:border-accent-blue hover:bg-blue-50 transition-all group text-left">
-                                <div className="h-12 w-12 bg-blue-100 text-accent-blue rounded-full flex items-center justify-center mr-4 group-hover:bg-accent-blue group-hover:text-white transition-colors">
-                                    <User className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-navy-900">Voter</h3>
-                                    <p className="text-sm text-slate-500">Cast your vote securely</p>
-                                </div>
-                            </button>
-
-                            <button onClick={() => setShowAdminLogin(true)} className="flex items-center p-4 border border-slate-200 rounded-xl hover:border-navy-900 hover:bg-slate-50 transition-all group text-left">
-                                <div className="h-12 w-12 bg-slate-100 text-navy-900 rounded-full flex items-center justify-center mr-4 group-hover:bg-navy-900 group-hover:text-white transition-colors">
-                                    <Shield className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-navy-900">Admin</h3>
-                                    <p className="text-sm text-slate-500">Manage elections</p>
-                                </div>
-                            </button>
-
-                            <button onClick={handleAuditorLogin} className="flex items-center p-4 border border-slate-200 rounded-xl hover:border-teal-600 hover:bg-teal-50 transition-all group text-left">
-                                <div className="h-12 w-12 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mr-4 group-hover:bg-teal-600 group-hover:text-white transition-colors">
-                                    <Lock className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-navy-900">Auditor</h3>
-                                    <p className="text-sm text-slate-500">View transaction logs</p>
-                                </div>
-                            </button>
+                <section className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
+                    <div className="space-y-4">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-4 py-2 text-sm text-slate-200">
+                            <FileText className="h-4 w-4 text-cyan-300" />
+                            Access portal
                         </div>
-                    ) : (
-                        <form onSubmit={handleAdminLogin} className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-bold text-navy-900">Admin Login</h3>
-                                <button type="button" onClick={() => setShowAdminLogin(false)} className="text-sm text-slate-500 hover:text-accent-blue">Back</button>
-                            </div>
+                        <h2 className="text-2xl font-semibold text-white">Choose your flow</h2>
+                        <p className="text-sm leading-6 text-slate-300">
+                            Voters use a shared code. Creators sign in to manage elections and monitor results.
+                        </p>
+                    </div>
 
-                            {error && (
-                                <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm flex items-center">
-                                    <AlertCircle className="h-4 w-4 mr-2" />
-                                    {error}
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                                <input
-                                    type="text"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent-blue focus:border-accent-blue outline-none transition-all"
-                                    placeholder="admin"
-                                />
+                    <div className="mt-6 grid gap-4">
+                        <button onClick={() => navigate('/join')} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-left transition hover:bg-slate-900">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300">
+                                <Vote className="h-5 w-5" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent-blue focus:border-accent-blue outline-none transition-all"
-                                    placeholder="admin123"
-                                />
+                                <h3 className="font-semibold text-white">Vote in Election</h3>
+                                <p className="text-sm text-slate-400">Open a shared URL or enter a short election code.</p>
                             </div>
-                            <button className="w-full py-3 bg-navy-900 text-white rounded-lg font-bold hover:bg-navy-800 transition-colors">Login</button>
-                        </form>
-                    )}
+                        </button>
 
-                </div>
+                        <button onClick={() => navigate('/creator/login')} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-left transition hover:bg-slate-900">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
+                                <ShieldCheck className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-white">Create Voting Booth</h3>
+                                <p className="text-sm text-slate-400">Log in, create elections, generate links, and manage candidates.</p>
+                            </div>
+                        </button>
+
+                        <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-left transition hover:bg-slate-900">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300">
+                                <FileText className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-white">Live Results</h3>
+                                <p className="text-sm text-slate-400">Review vote totals and election status.</p>
+                            </div>
+                        </button>
+                    </div>
+                </section>
             </div>
         </div>
     );

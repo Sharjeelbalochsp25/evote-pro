@@ -79,26 +79,24 @@ VITE_FIREBASE_APP_ID=
 FIREBASE_SERVICE_ACCOUNT=
 ```
 
-## Firebase Deployment
+## Deployment Overview
 
-1. Replace the placeholder project id in [`.firebaserc`](.firebaserc).
-2. Deploy on free tier (recommended default):
+Use these docs for the exact release flow:
 
-```bash
-npm run deploy:firebase
-```
+- [Environment Setup](ENVIRONMENT_SETUP.md)
+- [Firebase Setup](FIREBASE_SETUP.md)
+- [Deploy Checklist](DEPLOY_CHECKLIST.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
 
-3. Optional full stack deploy with backend Functions (requires Blaze billing plan):
+Deployment flow summary:
 
-```bash
-npm run deploy:firebase:full
-```
-
-4. Build manually when needed:
-
-```bash
-npm run build
-```
+1. Configure Firebase Auth, Firestore, and service credentials.
+2. Set all required `VITE_FIREBASE_*` variables in Firebase Hosting environment config or your local `.env` files for development.
+3. Run `npm run validate:firebase` and `npm run build` before any release.
+4. Deploy Firestore rules and indexes.
+5. Deploy Firebase Hosting.
+6. Run the Firestore smoke test in the target environment.
+7. Promote only after the smoke test passes.
 
 ## Security Notes
 
@@ -110,18 +108,11 @@ npm run build
 
 See [HOSTING.md](HOSTING.md) for the full step-by-step deployment guide.
 
-## Vercel Deployment (recommended)
-
-- The project is hosted on Vercel and uses serverless API wrappers in `api/*.cjs` to avoid ESM/CommonJS mismatches when the repository root uses `"type":"module"`.
-- `vercel.json` routes `/api/(.*)` to `/api/$1.cjs` so API handlers run as CommonJS functions.
-- Make sure the following environment variables are set in the Vercel project settings (Dashboard → Settings → Environment Variables):
-	- **FIREBASE_SERVICE_ACCOUNT**: full JSON contents of the Firebase service account (string). This is required by `firebase-admin` at runtime.
-	- **FIREBASE_PROJECT_ID** / **VITE_FIREBASE_PROJECT_ID**: your Firebase project id.
-	- Any `VITE_...` client keys your app needs.
+For the hardened deployment checklist and environment matrix, see [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md) and [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md).
 
 ## Smoke tests & Verification (Playwright browser flow)
 
-To work around Vercel's bot security checkpoint for automated HTTP clients, this repository includes a Playwright-based browser flow that performs a real browser POST to the serverless API (same flow a real user would take).
+This repository uses a browser-based verification flow for public voting so you can exercise the deployed app in the same way a real voter does.
 
 Quick commands (PowerShell):
 
@@ -131,43 +122,35 @@ Quick commands (PowerShell):
 node tools/smokeCreateResources.mjs
 ```
 
-2) Cast a browser vote (replace `PUBLIC` and `CANDIDATE` with values from step 1):
-
-```powershell
-node tools/browserVote.cjs <PUBLIC_CODE> <CANDIDATE_ID>
-```
-
-3) Verify candidate votes (use a local service account file if you don't rely on Vercel secrets):
+2) Verify candidate votes after using the live public vote page:
 
 ```powershell
 node tools/checkCandidate.cjs users/<uid>/elections/<electionId>/candidates/<candidateId> "C:\path\to\service-account.json"
 ```
 
-4) (Optional) Cleanup the test election:
+3) (Optional) Cleanup the test election:
 
 ```powershell
 node tools/cleanupPublicElection.cjs <publicCodeOrElectionId>
 ```
 
+For a service-account-backed Firestore connectivity check, run:
+
+```powershell
+npm run smoke:firebase
+```
+
 Notes:
 - Playwright is a devDependency and may require `npx playwright install --with-deps` on CI or new machines.
-- If you prefer fully automated API calls (no browser), you will need to disable or adjust the Vercel Security Checkpoint in your Vercel project settings; otherwise use the browser-flow above.
 
 ## Troubleshooting
 
-- If you see `require is not defined` or ESM-related errors on Vercel, ensure serverless handlers are `.cjs` and `vercel.json` routing is intact.
-- If `firebase-admin` fails to initialize in Vercel, confirm `FIREBASE_SERVICE_ACCOUNT` contains the full JSON string and `FIREBASE_PROJECT_ID` is correct.
-- To inspect runtime logs for the Vercel deployment:
-
-```powershell
-npx vercel logs <project-or-deployment> --prod --since 1h
-```
+- If `firebase-admin` fails to initialize in Firebase runtimes or smoke tests, confirm `FIREBASE_SERVICE_ACCOUNT` contains the full JSON string and `FIREBASE_PROJECT_ID` is correct.
+- If the build fails, confirm every `VITE_FIREBASE_*` env var is present and that demo mode is not enabled in production.
 
 ## Files of interest
-- `api/*.cjs` — Vercel serverless wrappers
 - `backend/firebaseAdmin.js` — `firebase-admin` initialization (reads `FIREBASE_SERVICE_ACCOUNT`)
 - `tools/smokeCreateResources.mjs` — creates test resources
-- `tools/browserVote.cjs` — Playwright browser-based vote
 - `tools/checkCandidate.cjs` — fetch a candidate document for verification
 - `tools/cleanupPublicElection.cjs` — delete public election and related docs
 

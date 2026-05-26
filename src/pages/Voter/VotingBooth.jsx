@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useVote } from '../../context/VoteContext';
+import { useVote } from '../../context/ElectionContext';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -52,7 +52,7 @@ const VotingBooth = () => {
                 <h2 className="text-3xl font-bold text-navy-900">Official Ballot Paper</h2>
                 <p className="text-slate-500">Select one candidate from the list below. This action cannot be undone.</p>
                 <div className="mt-4 inline-flex items-center px-4 py-2 bg-blue-50 text-accent-blue rounded-full text-sm font-medium">
-                    Verified Voter: {currentVoter?.data?.name} ({currentVoter?.data?.cnic})
+                    Verified Voter: {currentVoter?.data?.name} ({currentVoter?.data?.identifier})
                 </div>
             </div>
 

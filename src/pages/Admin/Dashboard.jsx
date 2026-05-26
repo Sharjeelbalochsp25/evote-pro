@@ -1,14 +1,81 @@
-import React, { useState } from 'react';
-import { useVote } from '../../context/VoteContext';
-import { Users, Trash2, RotateCcw, Plus, Award } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { useVote } from '../../context/ElectionContext';
+import { Award, Copy, Link as LinkIcon, Plus, RotateCcw, Trash2, Users } from 'lucide-react';
 
 const AdminDashboard = () => {
-    const { candidates, voters, resetElection, addCandidate, removeCandidate } = useVote();
+    const {
+        elections,
+        activeElection,
+        activeElectionId,
+        candidates,
+        voters,
+        inviteTokens,
+        backendError,
+        createElection,
+        selectElection,
+        finishElection,
+        deleteElection,
+        resetElection,
+        addCandidate,
+        removeCandidate,
+        generateInviteTokens,
+        revokeInviteToken,
+    } = useVote();
+
+    const [newElection, setNewElection] = useState({ title: '', description: '', verification: 'CNIC' });
     const [newCandidate, setNewCandidate] = useState({ name: '', party: '' });
+    const [inviteCount, setInviteCount] = useState('5');
+    const [generatedTokens, setGeneratedTokens] = useState([]);
     const [isAdding, setIsAdding] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
 
     const totalVotes = candidates.reduce((acc, curr) => acc + curr.votes, 0);
     const leadingCandidate = [...candidates].sort((a, b) => b.votes - a.votes)[0];
+    const shareLink = activeElection?.publicCode ? `${window.location.origin}/vote/${activeElection.publicCode}` : '';
+    const canManageElection = Boolean(activeElectionId);
+
+    const verificationOptions = useMemo(() => [
+        { value: 'CNIC', label: 'CNIC' },
+        { value: 'STUDENT_ID', label: 'Student ID' },
+        { value: 'EMPLOYEE_ID', label: 'Employee ID' },
+        { value: 'PASSPORT', label: 'Passport' },
+        { value: 'PHONE_NUMBER', label: 'Phone Number' },
+        { value: 'CUSTOM', label: 'Custom Field' },
+    ], []);
+
+    const handleCreateElection = async (event) => {
+        event.preventDefault();
+        if (!newElection.title.trim()) return;
+
+        setIsCreating(true);
+        await createElection({
+            title: newElection.title,
+            description: newElection.description,
+            verification: { method: newElection.verification, customLabel: '' },
+        });
+        setIsCreating(false);
+        setNewElection({ title: '', description: '', verification: 'CNIC' });
+    };
+
+    const handleCopyLink = async () => {
+        if (!shareLink) return;
+
+        await navigator.clipboard.writeText(shareLink);
+    };
+
+    const handleGenerateInvites = async (event) => {
+        event.preventDefault();
+        const result = await generateInviteTokens(Number(inviteCount) || 1);
+        if (result?.success) {
+            setGeneratedTokens(result.tokens || []);
+        }
+    };
+
+    const handleCopyToken = async (token) => {
+        if (!token) return;
+
+        await navigator.clipboard.writeText(token);
+    };
 
     const handleAddCandidate = async (e) => {
         e.preventDefault();
@@ -28,26 +95,197 @@ const AdminDashboard = () => {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-navy-900">Election Control Center</h1>
-                    <p className="text-slate-500">Manage candidates and monitor election status.</p>
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">Creator workspace</p>
+                        <h1 className="mt-2 text-3xl font-bold text-slate-950">Election Control Center</h1>
+                        <p className="mt-2 max-w-2xl text-slate-600">Create elections, switch between them, share public links, and monitor the vote ledger.</p>
+                    </div>
+
+                    <button
+                        onClick={async () => {
+                            if (window.confirm('Are you sure you want to reset the entire active election? This cannot be undone.')) {
+                                await resetElection();
+                            }
+                        }}
+                        disabled={!canManageElection}
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset Active Election
+                    </button>
                 </div>
-                <button
-                    onClick={async () => {
-                        if (window.confirm("Are you sure you want to reset the entire election? This cannot be undone.")) {
-                            await resetElection();
-                        }
-                    }}
-                    className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 flex items-center space-x-2 text-sm font-medium"
-                >
-                    <RotateCcw className="h-4 w-4" />
-                    <span>Reset Election</span>
-                </button>
-            </div>
+
+                {backendError && <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{backendError}</p>}
+            </section>
+
+            <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">Elections</p>
+                            <h2 className="mt-2 text-2xl font-bold text-slate-950">Create or switch election</h2>
+                            <p className="mt-2 text-slate-600">Each creator can manage multiple elections from one account.</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleCreateElection} className="mt-6 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Election title</label>
+                                <input
+                                    value={newElection.title}
+                                    onChange={(event) => setNewElection((prev) => ({ ...prev, title: event.target.value }))}
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-cyan-400"
+                                    placeholder="Election title"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Verification method</label>
+                                <select
+                                    value={newElection.verification}
+                                    onChange={(event) => setNewElection((prev) => ({ ...prev, verification: event.target.value }))}
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-cyan-400"
+                                >
+                                    {verificationOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+                            <textarea
+                                value={newElection.description}
+                                onChange={(event) => setNewElection((prev) => ({ ...prev, description: event.target.value }))}
+                                className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-cyan-400"
+                                placeholder="Optional description"
+                            />
+                        </div>
+                        <div className="flex justify-end">
+                            <button
+                                type="submit"
+                                disabled={isCreating || !newElection.title.trim()}
+                                className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Create Voting Booth
+                            </button>
+                        </div>
+                    </form>
+
+                    <div className="mt-6 space-y-3">
+                        {elections.length === 0 ? (
+                            <p className="rounded-2xl border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500">No elections yet. Create your first one to begin.</p>
+                        ) : elections.map((election) => (
+                            <button
+                                key={election.id}
+                                onClick={() => selectElection(election.id)}
+                                className={`w-full rounded-2xl border p-4 text-left transition ${activeElectionId === election.id ? 'border-cyan-300 bg-cyan-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                            >
+                                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-semibold text-slate-950">{election.title}</h3>
+                                            {activeElectionId === election.id && <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">Active</span>}
+                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${election.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{election.isActive ? 'Open' : 'Closed'}</span>
+                                        </div>
+                                        <p className="mt-1 text-sm text-slate-600">{election.description || 'No description'}</p>
+                                        <p className="mt-2 text-xs text-slate-500">Code: {election.publicCode || election.publicLink || 'N/A'}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button type="button" onClick={() => finishElection(election.id, false)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white">Open</button>
+                                        <button type="button" onClick={() => finishElection(election.id, true)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white">Close</button>
+                                        <button type="button" onClick={() => deleteElection(election.id)} className="rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Delete</button>
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">Election sharing</p>
+                    <h2 className="mt-2 text-2xl font-bold text-slate-950">{activeElection?.title || 'No active election'}</h2>
+                    <p className="mt-2 text-slate-600">{activeElection?.description || 'Select an election to view its public link and status.'}</p>
+
+                    {activeElection ? (
+                        <div className="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Public link</p>
+                                <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                    <LinkIcon className="h-4 w-4 text-cyan-600" />
+                                    <span className="min-w-0 flex-1 truncate">{shareLink}</span>
+                                    <button type="button" onClick={handleCopyLink} className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                                        <Copy className="h-3.5 w-3.5" />
+                                        Copy Link
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-3 md:grid-cols-3">
+                                <div className="rounded-2xl bg-white p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Votes cast</p>
+                                    <p className="mt-2 text-2xl font-bold text-slate-950">{totalVotes}</p>
+                                </div>
+                                <div className="rounded-2xl bg-white p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Voters</p>
+                                    <p className="mt-2 text-2xl font-bold text-slate-950">{voters.length}</p>
+                                </div>
+                                <div className="rounded-2xl bg-white p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Status</p>
+                                    <p className="mt-2 text-2xl font-bold text-slate-950">{activeElection.isActive ? 'Open' : 'Closed'}</p>
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-800">Invite tokens</p>
+                                        <p className="mt-1 text-sm text-cyan-900">Generate per-election tokens that voters must enter before voting.</p>
+                                    </div>
+                                    <form onSubmit={handleGenerateInvites} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="100"
+                                            value={inviteCount}
+                                            onChange={(event) => setInviteCount(event.target.value)}
+                                            className="w-24 rounded-xl border border-cyan-200 bg-white px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                        />
+                                        <button type="submit" className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500">
+                                            Generate
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <div className="mt-4 space-y-2">
+                                    {inviteTokens.length === 0 && generatedTokens.length === 0 ? (
+                                        <p className="text-sm text-cyan-900/70">No invite tokens yet.</p>
+                                    ) : (
+                                        [...inviteTokens.map((entry) => entry.token), ...generatedTokens]
+                                            .filter((token, index, all) => token && all.indexOf(token) === index)
+                                            .map((token) => (
+                                                <div key={token} className="flex items-center justify-between gap-3 rounded-xl border border-cyan-100 bg-white px-4 py-3 text-sm">
+                                                    <span className="font-mono text-cyan-950">{token}</span>
+                                                    <button type="button" onClick={() => handleCopyToken(token)} className="rounded-lg border border-cyan-200 px-3 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-50">
+                                                        Copy
+                                                    </button>
+                                                </div>
+                                            ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="mt-6 rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Create or select an election to view the share link and live stats.</div>
+                    )}
+                </div>
+            </section>
 
             {/* Stats Cards */}
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid gap-6 md:grid-cols-3">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-slate-500 font-medium">Total Votes Cast</span>
@@ -79,6 +317,7 @@ const AdminDashboard = () => {
                     <h3 className="font-bold text-lg text-navy-900">Candidates Registry</h3>
                     <button
                         onClick={() => setIsAdding(!isAdding)}
+                        disabled={!canManageElection}
                         className="px-4 py-2 bg-navy-900 text-white rounded-lg text-sm font-medium hover:bg-navy-800 flex items-center space-x-2"
                     >
                         <Plus className="h-4 w-4" />

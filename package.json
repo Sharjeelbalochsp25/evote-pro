@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite",
     "dev:emulator": "vite --mode emulator",
-    "build": "vite build",
+    "validate:firebase": "node tools/validate-firebase-env.mjs",
+    "prebuild": "npm run validate:firebase",
+    "build": "npm run validate:firebase && vite build",
+    "smoke:firebase": "node tools/firestoreSmokeTest.mjs",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "emulators:start": "npx firebase-tools emulators:start --project evotepro-7deff --only auth,firestore,functions",
-    "deploy:firebase": "npx firebase-tools deploy --only firestore:rules,hosting",
-    "deploy:firebase:full": "npx firebase-tools deploy --only firestore:rules,functions,hosting"
+    "emulators:start": "npx firebase-tools emulators:start --project evotepro-7deff --only auth,firestore",
+    "deploy:firebase": "npx firebase-tools deploy --only firestore:rules,hosting"
   },
   "dependencies": {
     "clsx": "^2.1.0",

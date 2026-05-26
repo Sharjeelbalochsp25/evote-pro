@@ -7,7 +7,8 @@ import {
     updateProfile,
 } from 'firebase/auth';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db, hasFirebaseConfig } from '../firebase';
+import { auth, db, hasDemoMode, hasFirebaseConfig } from '../firebase';
+import { classifyFirebaseError } from '../utils/firebaseErrors';
 
 const AuthContext = createContext();
 
@@ -22,6 +23,7 @@ const normalizeAuthError = (error) => {
     if (code === 'auth/user-not-found') return 'Invalid email or password';
     if (code === 'auth/wrong-password') return 'Invalid email or password';
     if (code === 'auth/too-many-requests') return 'Too many attempts. Try again later.';
+    if (code === 'auth/network-request-failed') return 'Network error while contacting Firebase Auth.';
 
     return error?.message || 'Something went wrong. Please try again.';
 };
@@ -29,41 +31,78 @@ const normalizeAuthError = (error) => {
 export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [authLoading, setAuthLoading] = useState(true);
+    const [authError, setAuthError] = useState('');
 
-    // Local-only fallback user store (used only when Firebase env vars are missing).
     const [users, setUsers] = useState(() => {
+        if (!hasDemoMode) {
+            return [];
+        }
+
         const saved = localStorage.getItem('users');
         return saved ? JSON.parse(saved) : [];
     });
 
     useEffect(() => {
-        if (!hasFirebaseConfig) {
+        if (hasDemoMode) {
             localStorage.setItem('users', JSON.stringify(users));
         }
     }, [users]);
 
     useEffect(() => {
-        if (!hasFirebaseConfig || !auth) {
+        if (hasDemoMode || !hasFirebaseConfig || !auth) {
             setAuthLoading(false);
-            return;
+            return undefined;
         }
 
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                setCurrentUser(null);
-                setAuthLoading(false);
-                return;
-            }
-
-            setCurrentUser({
-                id: user.uid,
-                email: user.email,
-                name: user.displayName || user.email,
-            });
+        let settled = false;
+        const timeoutId = window.setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            setAuthError('Firebase auth initialization timed out. Check network access, Auth configuration, and browser connectivity.');
             setAuthLoading(false);
-        });
+        }, 10000);
 
-        return unsubscribe;
+        const unsubscribe = onAuthStateChanged(
+            auth,
+            (user) => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
+                setAuthError('');
+
+                if (user?.isAnonymous) {
+                    setCurrentUser(null);
+                    setAuthLoading(false);
+                    return;
+                }
+
+                if (!user) {
+                    setCurrentUser(null);
+                    setAuthLoading(false);
+                    return;
+                }
+
+                setCurrentUser({
+                    id: user.uid,
+                    email: user.email,
+                    name: user.displayName || user.email,
+                });
+                setAuthLoading(false);
+            },
+            (error) => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
+                setAuthError(classifyFirebaseError(error, 'Firebase auth initialization failed.'));
+                setAuthLoading(false);
+            },
+        );
+
+        return () => {
+            settled = true;
+            window.clearTimeout(timeoutId);
+            unsubscribe();
+        };
     }, []);
 
     const signup = async (email, password, name) => {
@@ -75,9 +114,8 @@ export const AuthProvider = ({ children }) => {
             return { success: false, error: 'Password must be at least 6 characters' };
         }
 
-        // Local-only mode
-        if (!hasFirebaseConfig || !auth) {
-            if (users.some((u) => u.email === email)) {
+        if (hasDemoMode || !hasFirebaseConfig || !auth) {
+            if (users.some((user) => user.email === email)) {
                 return { success: false, error: 'Email already registered' };
             }
 
@@ -89,7 +127,7 @@ export const AuthProvider = ({ children }) => {
                 createdAt: new Date().toISOString(),
             };
 
-            setUsers((prev) => [...prev, newUser]);
+            setUsers((previous) => [...previous, newUser]);
             setCurrentUser({ id: newUser.id, email, name });
             return { success: true };
         }
@@ -116,9 +154,12 @@ export const AuthProvider = ({ children }) => {
                 );
             }
 
+            setAuthError('');
             return { success: true };
         } catch (error) {
-            return { success: false, error: normalizeAuthError(error) };
+            const message = classifyFirebaseError(error, normalizeAuthError(error));
+            setAuthError(message);
+            return { success: false, error: message };
         }
     };
 
@@ -127,12 +168,12 @@ export const AuthProvider = ({ children }) => {
             return { success: false, error: 'Email and password are required' };
         }
 
-        // Local-only mode
-        if (!hasFirebaseConfig || !auth) {
-            const user = users.find((u) => u.email === email && u.password === password);
+        if (hasDemoMode || !hasFirebaseConfig || !auth) {
+            const user = users.find((entry) => entry.email === email && entry.password === password);
             if (!user) {
                 return { success: false, error: 'Invalid email or password' };
             }
+
             setCurrentUser({ id: user.id, email: user.email, name: user.name });
             return { success: true };
         }
@@ -144,14 +185,17 @@ export const AuthProvider = ({ children }) => {
                 email: credential.user.email,
                 name: credential.user.displayName || credential.user.email,
             });
+            setAuthError('');
             return { success: true };
         } catch (error) {
-            return { success: false, error: normalizeAuthError(error) };
+            const message = classifyFirebaseError(error, normalizeAuthError(error));
+            setAuthError(message);
+            return { success: false, error: message };
         }
     };
 
     const logout = async () => {
-        if (!hasFirebaseConfig || !auth) {
+        if (hasDemoMode || !hasFirebaseConfig || !auth) {
             setCurrentUser(null);
             return { success: true };
         }
@@ -162,7 +206,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ currentUser, authLoading, signup, login, logout }}>
+        <AuthContext.Provider value={{ currentUser, authLoading, authError, signup, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

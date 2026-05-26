@@ -1,5 +1,5 @@
 import React from 'react';
-import { useVote } from '../../context/VoteContext';
+import { useVote } from '../../context/ElectionContext';
 import { FileText, Search } from 'lucide-react';
 
 const AuditLog = () => {

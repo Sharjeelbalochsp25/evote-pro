@@ -1,6 +1,6 @@
 # Hosting Guide for E-VotePro
 
-This guide explains how to deploy your E-VotePro frontend to the web. Since this is a Vite React application, it can be hosted easily on Vercel or Netlify.
+This guide explains how to deploy E-VotePro on Firebase Hosting with Firestore and Firebase Auth only.
 
 ## Prerequisites
 1. **Node.js**: Ensure you have Node.js installed on your machine. [Download Here](https://nodejs.org/).
@@ -20,7 +20,7 @@ Since the files were generated manually, you first need to install the project d
    ```
 
 ## Step 2: Push to GitHub
-1. Create a new repository on GitHub (e.g., `evotepro-frontend`).
+1. Create a new repository on GitHub.
 2. Initialize git in your project folder:
    ```bash
    git init
@@ -31,27 +31,21 @@ Since the files were generated manually, you first need to install the project d
    git push -u origin main
    ```
 
-## Step 3: Hosting on Vercel (Recommended)
-1. Go to [Vercel.com](https://vercel.com) and sign up with GitHub.
-2. Click **"Add New Project"**.
-3. Import your `evotepro-frontend` repository.
-4. Vercel will auto-detect the Vite framework.
-   - **Build Command**: `vite build` (or `npm run build`)
-   - **Output Directory**: `dist`
-5. Click **Deploy**.
-6. Wait 1-2 minutes. Your site is now live!
-
-## Step 4: Hosting on Netlify
-1. Go to [Netlify.com](https://netlify.com) and sign up with GitHub.
-2. Click **"Add new site"** -> **"Import an existing project"**.
-3. Select GitHub and choose your `evotepro-frontend` repo.
-4. Netlify will detect the settings:
-   - **Build command**: `npm run build`
-   - **Publish directory**: `dist`
-5. Click **Deploy site**.
+## Step 3: Deploy to Firebase Hosting
+1. Install and authenticate the Firebase CLI.
+2. Confirm your Firebase project is selected.
+3. Build the frontend:
+   ```bash
+   npm run build
+   ```
+4. Deploy hosting and Firestore rules:
+   ```bash
+   npx firebase-tools deploy --only firestore:rules,hosting --project evotepro-7deff
+   ```
+5. Open the generated Firebase Hosting URL and verify the public vote route, creator login, and dashboard.
 
 ## Notes
 - **Data Persistence**:
    - If you configure Firebase (Auth + Firestore) via `VITE_FIREBASE_*` env vars, election data is stored in Firestore and is available across devices.
    - If Firebase env vars are missing, the app intentionally falls back to `localStorage` (single-browser demo mode).
-   - For Vercel/Netlify deployments, add the same `VITE_FIREBASE_*` variables from `.env.example` in your hosting provider's Environment Variables settings.
+   - For Firebase Hosting, set the same `VITE_FIREBASE_*` variables in your local build environment and CI environment before deploy.

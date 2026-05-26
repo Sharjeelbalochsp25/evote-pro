@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAnonymous() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function electionDoc(uid, electionId) {
+      return get(/databases/$(database)/documents/users/$(uid)/elections/$(electionId));
+    }
+
+    function publicElectionDoc(publicCode) {
+      return get(/databases/$(database)/documents/publicElections/$(publicCode));
+    }
+
+    function inviteDoc(publicCode, inviteToken) {
+      return get(/databases/$(database)/documents/publicElections/$(publicCode)/invites/$(inviteToken));
+    }
+
+    function publicElectionLinked(uid, electionId) {
+      let electionPath = /databases/$(database)/documents/users/$(uid)/elections/$(electionId);
+
+      return exists(electionPath)
+        && get(electionPath).data.creatorId == uid
+        && get(electionPath).data.isActive == true
+        && get(electionPath).data.publicCode is string
+        && exists(/databases/$(database)/documents/publicElections/$(get(electionPath).data.publicCode))
+        && get(/databases/$(database)/documents/publicElections/$(get(electionPath).data.publicCode)).data.creatorId == uid
+        && get(/databases/$(database)/documents/publicElections/$(get(electionPath).data.publicCode)).data.electionId == electionId;
+    }
+
+    function candidateVoteAfterUpdate(uid, electionId, candidateId) {
+      let candidatePath = /databases/$(database)/documents/users/$(uid)/elections/$(electionId)/candidates/$(candidateId);
+      let candidate = get(candidatePath);
+
+      return exists(candidatePath)
+        && existsAfter(candidatePath)
+        && getAfter(candidatePath).data.votes == candidate.data.votes + 1;
+    }
+
+    function voteRecordAfter(uid, electionId) {
+      let voteRecordPath = /databases/$(database)/documents/users/$(uid)/elections/$(electionId)/voters/$(request.auth.uid);
+      let voteRecord = getAfter(voteRecordPath);
+
+      return existsAfter(voteRecordPath)
+        && voteRecord.data.authUid == request.auth.uid
+        && voteRecord.data.hasVoted == true
+        && voteRecord.data.inviteToken is string
+        && voteRecord.data.candidateId is int
+        && voteRecord.data.publicCode is string
+        && voteRecord.data.electionId == electionId;
+    }
+
+    function inviteUsedAfter(publicCode, inviteToken, electionId) {
+      let invitePath = /databases/$(database)/documents/publicElections/$(publicCode)/invites/$(inviteToken);
+      let invite = get(invitePath);
+
+      return exists(invitePath)
+        && invite.data.publicCode == publicCode
+        && invite.data.electionId == electionId
+        && invite.data.used == false
+        && existsAfter(invitePath)
+        && getAfter(invitePath).data.used == true
+        && getAfter(invitePath).data.usedBy == request.auth.uid
+        && getAfter(invitePath).data.publicCode == publicCode
+        && getAfter(invitePath).data.electionId == electionId;
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /elections/{electionId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid)
+          && request.resource.data.creatorId == resource.data.creatorId
+          && request.resource.data.publicLink == resource.data.publicLink;
+        allow delete: if isOwner(uid);
+
+        match /candidates/{candidateId} {
+          allow read: if isOwner(uid);
+          allow create: if isOwner(uid)
+            && request.resource.data.votes is int
+            && request.resource.data.votes == 0;
+          allow update: if isOwner(uid)
+            && request.resource.data.votes == resource.data.votes;
+          allow update: if isAnonymous()
+            && request.resource.data.keys().hasOnly(['id', 'name', 'party', 'votes', 'createdAt', 'updatedAt'])
+            && request.resource.data.id == resource.data.id
+            && request.resource.data.name == resource.data.name
+            && request.resource.data.party == resource.data.party
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.votes == resource.data.votes + 1
+            && existsAfter(/databases/$(database)/documents/users/$(uid)/elections/$(electionId)/voters/$(request.auth.uid))
+            && existsAfter(/databases/$(database)/documents/users/$(uid)/elections/$(electionId)/auditLog/$(request.auth.uid));
+          allow delete: if isOwner(uid);
+        }
+
+        match /voters/{voterId} {
+          allow read: if isOwner(uid);
+          allow create, update, delete: if isOwner(uid);
+          allow create: if isAnonymous()
+            && voterId == request.auth.uid
+            && !exists(/databases/$(database)/documents/users/$(uid)/elections/$(electionId)/voters/$(voterId))
+            && request.resource.data.keys().hasOnly(['inviteToken', 'authUid', 'candidateId', 'publicCode', 'electionId', 'hasVoted', 'votedAt'])
+            && request.resource.data.inviteToken is string
+            && request.resource.data.authUid == request.auth.uid
+            && request.resource.data.candidateId is int
+            && request.resource.data.publicCode == electionDoc(uid, electionId).data.publicCode
+            && request.resource.data.electionId == electionId
+            && request.resource.data.hasVoted == true
+            && inviteUsedAfter(request.resource.data.publicCode, request.resource.data.inviteToken, electionId);
+        }
+
+        match /auditLog/{logId} {
+          allow read: if isOwner(uid);
+          allow create, update, delete: if isOwner(uid);
+          allow create: if isAnonymous()
+            && logId == request.auth.uid
+            && request.resource.data.keys().hasOnly(['id', 'inviteToken', 'voterHash', 'candidateId', 'publicCode', 'electionId', 'timestamp'])
+            && request.resource.data.id == request.auth.uid
+            && request.resource.data.inviteToken is string
+            && request.resource.data.candidateId is int
+            && request.resource.data.publicCode == electionDoc(uid, electionId).data.publicCode
+            && request.resource.data.electionId == electionId
+            && request.resource.data.voterHash is string
+            && inviteUsedAfter(request.resource.data.publicCode, request.resource.data.inviteToken, electionId)
+            && existsAfter(/databases/$(database)/documents/users/$(uid)/elections/$(electionId)/voters/$(request.auth.uid));
+        }
+      }
+    }
+
+    match /publicElections/{publicCode} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.creatorId == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.creatorId == request.auth.uid
+        && request.resource.data.creatorId == resource.data.creatorId
+        && request.resource.data.electionId == resource.data.electionId;
+      allow delete: if signedIn() && resource.data.creatorId == request.auth.uid;
+
+      match /invites/{inviteToken} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.creatorId == request.auth.uid
+          && exists(/databases/$(database)/documents/publicElections/$(publicCode))
+          && get(/databases/$(database)/documents/publicElections/$(publicCode)).data.creatorId == request.auth.uid
+          && get(/databases/$(database)/documents/publicElections/$(publicCode)).data.electionId == request.resource.data.electionId
+          && request.resource.data.keys().hasOnly(['token', 'creatorId', 'publicCode', 'electionId', 'used', 'usedBy', 'usedAt', 'createdAt', 'updatedAt'])
+          && request.resource.data.token == inviteToken
+          && request.resource.data.publicCode == publicCode
+          && request.resource.data.used == false
+          && request.resource.data.usedBy == '';
+        allow update: if isAnonymous()
+          && exists(/databases/$(database)/documents/publicElections/$(publicCode))
+          && get(/databases/$(database)/documents/publicElections/$(publicCode)).data.electionId == resource.data.electionId
+          && resource.data.used == false
+          && request.resource.data.keys().hasOnly(['token', 'creatorId', 'publicCode', 'electionId', 'used', 'usedBy', 'usedAt', 'createdAt', 'updatedAt'])
+          && request.resource.data.token == inviteToken
+          && request.resource.data.creatorId == resource.data.creatorId
+          && request.resource.data.publicCode == publicCode
+          && request.resource.data.electionId == resource.data.electionId
+          && request.resource.data.used == true
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt is timestamp;
+        allow delete: if signedIn()
+          && resource.data.creatorId == request.auth.uid
+          && resource.data.used == false;
+      }
+    }
+  }
+}

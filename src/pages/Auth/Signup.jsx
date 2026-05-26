@@ -27,7 +27,7 @@ const Signup = () => {
         setIsSubmitting(true);
 
         const result = await signup(formData.email, formData.password, formData.name);
-        if (result.success) navigate('/');
+        if (result.success) navigate('/creator/dashboard');
         else setError(result.error);
 
         setIsSubmitting(false);
@@ -110,7 +110,7 @@ const Signup = () => {
 
                     <div className="mt-6 text-center">
                         <p className="text-slate-600">Already have an account?{' '}
-                            <Link to="/login" className="text-accent-blue font-bold hover:underline">
+                            <Link to="/creator/login" className="text-accent-blue font-bold hover:underline">
                                 Log In
                             </Link>
                         </p>

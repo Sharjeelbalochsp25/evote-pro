@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 
 const Login = () => {
-    const { login } = useAuth();
+    const { login, authError } = useAuth();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
@@ -22,7 +22,7 @@ const Login = () => {
         setIsSubmitting(true);
 
         const result = await login(formData.email, formData.password);
-        if (result.success) navigate('/');
+        if (result.success) navigate('/creator/dashboard');
         else setError(result.error);
 
         setIsSubmitting(false);
@@ -41,6 +41,13 @@ const Login = () => {
                         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
                             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                             <p className="text-red-700 text-sm font-medium">{error}</p>
+                        </div>
+                    )}
+
+                    {authError && !error && (
+                        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start space-x-3">
+                            <AlertCircle className="h-5 w-5 text-amber-700 flex-shrink-0 mt-0.5" />
+                            <p className="text-amber-800 text-sm font-medium">{authError}</p>
                         </div>
                     )}
 
@@ -80,7 +87,7 @@ const Login = () => {
 
                     <div className="mt-6 text-center">
                         <p className="text-slate-600">Don't have an account?{' '}
-                            <Link to="/signup" className="text-accent-blue font-bold hover:underline">
+                            <Link to="/creator/signup" className="text-accent-blue font-bold hover:underline">
                                 Sign Up
                             </Link>
                         </p>

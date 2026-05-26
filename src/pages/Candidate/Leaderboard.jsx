@@ -1,5 +1,5 @@
 import React from 'react';
-import { useVote } from '../../context/VoteContext';
+import { useVote } from '../../context/ElectionContext';
 import { BarChart3 } from 'lucide-react';
 
 const Leaderboard = () => {
