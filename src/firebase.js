@@ -1,6 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app';
+import { getAnalytics, isSupported, logEvent } from 'firebase/analytics';
 import { connectAuthEmulator, getAuth } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import { recordClientEvent } from './utils/clientObservability';
 
 const REQUIRED_FIREBASE_KEYS = [
     'VITE_FIREBASE_API_KEY',
@@ -47,6 +49,38 @@ export const deploymentDiagnostics = {
     projectId: firebaseClientConfig.projectId || 'unknown',
 };
 
+let analyticsInstance = null;
+let analyticsInitPromise = null;
+
+export const ensureFirebaseAnalytics = async () => {
+    if (!app || typeof window === 'undefined') return null;
+    if (analyticsInstance) return analyticsInstance;
+
+    if (!analyticsInitPromise) {
+        analyticsInitPromise = isSupported()
+            .then((supported) => {
+                if (!supported) return null;
+                analyticsInstance = getAnalytics(app);
+                return analyticsInstance;
+            })
+            .catch(() => null);
+    }
+
+    return analyticsInitPromise;
+};
+
+export const trackAnalyticsEvent = async (eventName, params = {}) => {
+    const analytics = await ensureFirebaseAnalytics();
+    if (!analytics) return false;
+
+    try {
+        logEvent(analytics, eventName, params);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 const logStartupDiagnostics = () => {
     // eslint-disable-next-line no-console
     console.info('[Startup] Deployment diagnostics', deploymentDiagnostics);
@@ -63,6 +97,14 @@ const logStartupDiagnostics = () => {
         // eslint-disable-next-line no-console
         console.warn('[Startup] Firebase validation failed', { missing: firebaseDiagnostics.missing, demoMode: firebaseDiagnostics.demoMode });
     }
+
+    recordClientEvent('startup', 'Deployment diagnostics loaded', {
+        deploymentEnv: deploymentDiagnostics.deploymentEnv,
+        host: deploymentDiagnostics.host,
+        projectId: deploymentDiagnostics.projectId,
+        firebaseConfigValid: firebaseDiagnostics.valid,
+        demoMode: firebaseDiagnostics.demoMode,
+    });
 };
 
 logStartupDiagnostics();

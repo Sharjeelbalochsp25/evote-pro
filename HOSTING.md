@@ -1,51 +1,31 @@
 # Hosting Guide for E-VotePro
 
-This guide explains how to deploy E-VotePro on Firebase Hosting with Firestore and Firebase Auth only.
+This guide covers the current Firebase-only production deployment.
 
-## Prerequisites
-1. **Node.js**: Ensure you have Node.js installed on your machine. [Download Here](https://nodejs.org/).
-2. **GitHub Account**: You will need a GitHub account to push your code.
+## Build and Deploy
 
-## Step 1: Install Dependencies Local
-Since the files were generated manually, you first need to install the project dependencies.
+```powershell
+npm install
+npm run validate:firebase
+npm run build
+npm run deploy:firebase
+```
 
-1. Open a terminal in the `evotepro` folder.
-2. Run:
-   ```bash
-   npm install
-   ```
-3. Test the app locally:
-   ```bash
-   npm run dev
-   ```
+## Production Expectations
 
-## Step 2: Push to GitHub
-1. Create a new repository on GitHub.
-2. Initialize git in your project folder:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/evotepro-frontend.git
-   git push -u origin main
-   ```
+- Firebase Hosting serves the React/Vite build
+- Firestore stores the election, invite, voter, and audit data
+- Firebase Auth provides the public voter identity layer
+- The public vote path uses Firestore transactions only
+- There is no legacy hosted vote route in the production vote path
+- There is no backend vote function path in the production vote path
+- There is no production demo fallback
 
-## Step 3: Deploy to Firebase Hosting
-1. Install and authenticate the Firebase CLI.
-2. Confirm your Firebase project is selected.
-3. Build the frontend:
-   ```bash
-   npm run build
-   ```
-4. Deploy hosting and Firestore rules:
-   ```bash
-   npx firebase-tools deploy --only firestore:rules,hosting --project evotepro-7deff
-   ```
-5. Open the generated Firebase Hosting URL and verify the public vote route, creator login, and dashboard.
+## Local Development
 
-## Notes
-- **Data Persistence**:
-   - If you configure Firebase (Auth + Firestore) via `VITE_FIREBASE_*` env vars, election data is stored in Firestore and is available across devices.
-   - If Firebase env vars are missing, the app intentionally falls back to `localStorage` (single-browser demo mode).
-   - For Firebase Hosting, set the same `VITE_FIREBASE_*` variables in your local build environment and CI environment before deploy.
+```powershell
+npm run emulators:start
+npm run dev:emulator
+```
+
+Use the emulator flow for local QA and Playwright validation. Production builds must always be checked with `npm run validate:firebase` before deploy.

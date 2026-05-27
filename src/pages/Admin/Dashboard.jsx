@@ -1,6 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useVote } from '../../context/ElectionContext';
-import { Award, Copy, Link as LinkIcon, Plus, RotateCcw, Trash2, Users } from 'lucide-react';
+import { Award, Archive, Copy, Download, Link as LinkIcon, Lock, Plus, RotateCcw, ShieldAlert, Trash2, Users } from 'lucide-react';
+import {
+    buildCandidatesCsv,
+    buildElectionSnapshot,
+    buildInviteTokensCsv,
+    downloadJson,
+    downloadText,
+    formatClientTimestamp,
+    loadClientObservability,
+    maskInviteToken,
+    recordClientEvent,
+    subscribeClientObservability,
+} from '../../utils/clientObservability';
+import { trackAnalyticsEvent } from '../../firebase';
 
 const AdminDashboard = () => {
     const {
@@ -10,6 +23,7 @@ const AdminDashboard = () => {
         candidates,
         voters,
         inviteTokens,
+        auditLog,
         backendError,
         createElection,
         selectElection,
@@ -28,6 +42,9 @@ const AdminDashboard = () => {
     const [generatedTokens, setGeneratedTokens] = useState([]);
     const [isAdding, setIsAdding] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+    const [activityFeed, setActivityFeed] = useState(() => loadClientObservability());
+
+    useEffect(() => subscribeClientObservability((entries) => setActivityFeed(entries)), []);
 
     const totalVotes = candidates.reduce((acc, curr) => acc + curr.votes, 0);
     const leadingCandidate = [...candidates].sort((a, b) => b.votes - a.votes)[0];
@@ -77,6 +94,93 @@ const AdminDashboard = () => {
         await navigator.clipboard.writeText(token);
     };
 
+    const handleExportSnapshot = async () => {
+        if (!activeElection) return;
+
+        const snapshot = buildElectionSnapshot({
+            activeElection,
+            candidates,
+            voters,
+            auditLog,
+            inviteTokens,
+            adminActivity: activityFeed,
+        });
+
+        const fileName = `${activeElection.publicCode || activeElection.id || 'election'}-snapshot.json`;
+        downloadJson(fileName, snapshot);
+        recordClientEvent('admin:export-json', `Exported snapshot for ${activeElection.title}`, {
+            electionId: activeElection.id,
+            publicCode: activeElection.publicCode || '',
+        });
+        void trackAnalyticsEvent('admin_export_json', {
+            election_id: activeElection.id,
+        });
+    };
+
+    const handleExportCandidatesCsv = async () => {
+        if (!activeElection) return;
+
+        const csv = buildCandidatesCsv(candidates);
+        const fileName = `${activeElection.publicCode || activeElection.id || 'election'}-results.csv`;
+        downloadText(fileName, csv, 'text/csv;charset=utf-8');
+        recordClientEvent('admin:export-csv', `Exported candidate results for ${activeElection.title}`, {
+            electionId: activeElection.id,
+            publicCode: activeElection.publicCode || '',
+        });
+        void trackAnalyticsEvent('admin_export_csv', {
+            election_id: activeElection.id,
+        });
+    };
+
+    const handleExportInvitesCsv = async () => {
+        if (!activeElection) return;
+
+        const csv = buildInviteTokensCsv(inviteTokens);
+        const fileName = `${activeElection.publicCode || activeElection.id || 'election'}-invites.csv`;
+        downloadText(fileName, csv, 'text/csv;charset=utf-8');
+        recordClientEvent('admin:export-invites', `Exported invite list for ${activeElection.title}`, {
+            electionId: activeElection.id,
+            publicCode: activeElection.publicCode || '',
+        });
+    };
+
+    const handleArchiveElection = async () => {
+        if (!activeElection) return;
+
+        const ok = window.confirm(`Archive ${activeElection.title}? This will download a snapshot and keep the election closed.`);
+        if (!ok) return;
+
+        await handleExportSnapshot();
+        await finishElection(activeElection.id, true);
+        recordClientEvent('admin:archive-election', `Archived election ${activeElection.title}`, {
+            electionId: activeElection.id,
+            publicCode: activeElection.publicCode || '',
+        });
+    };
+
+    const handleSafeReset = async () => {
+        if (!activeElection) return;
+
+        const typedValue = window.prompt(`Type ${activeElection.title} to clear votes and audit history.`);
+        if (typedValue !== activeElection.title) return;
+
+        const result = await resetElection();
+        return result;
+    };
+
+    const handleRevokeInvite = async (token) => {
+        const ok = window.confirm(`Revoke invite token ${token}?`);
+        if (!ok) return;
+
+        const result = await revokeInviteToken(token);
+        if (result?.success) {
+            recordClientEvent('admin:revoke-invite-ui', 'Revoked invite token from dashboard', {
+                token: maskInviteToken(token),
+                electionId: activeElection?.id || '',
+            });
+        }
+    };
+
     const handleAddCandidate = async (e) => {
         e.preventDefault();
         if (newCandidate.name && newCandidate.party) {
@@ -103,18 +207,40 @@ const AdminDashboard = () => {
                         <p className="mt-2 max-w-2xl text-slate-600">Create elections, switch between them, share public links, and monitor the vote ledger.</p>
                     </div>
 
-                    <button
-                        onClick={async () => {
-                            if (window.confirm('Are you sure you want to reset the entire active election? This cannot be undone.')) {
-                                await resetElection();
-                            }
-                        }}
-                        disabled={!canManageElection}
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        <RotateCcw className="h-4 w-4" />
-                        Reset Active Election
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={handleExportCandidatesCsv}
+                            disabled={!canManageElection}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <Download className="h-4 w-4" />
+                            Export CSV
+                        </button>
+                        <button
+                            onClick={handleExportSnapshot}
+                            disabled={!canManageElection}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <Archive className="h-4 w-4" />
+                            Export JSON
+                        </button>
+                        <button
+                            onClick={handleArchiveElection}
+                            disabled={!canManageElection}
+                            className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 px-4 py-2 text-sm font-medium text-cyan-700 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <ShieldAlert className="h-4 w-4" />
+                            Archive and Close
+                        </button>
+                        <button
+                            onClick={handleSafeReset}
+                            disabled={!canManageElection}
+                            className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <RotateCcw className="h-4 w-4" />
+                            Safe Reset
+                        </button>
+                    </div>
                 </div>
 
                 {backendError && <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{backendError}</p>}
@@ -264,17 +390,116 @@ const AdminDashboard = () => {
                                     {inviteTokens.length === 0 && generatedTokens.length === 0 ? (
                                         <p className="text-sm text-cyan-900/70">No invite tokens yet.</p>
                                     ) : (
-                                        [...inviteTokens.map((entry) => entry.token), ...generatedTokens]
-                                            .filter((token, index, all) => token && all.indexOf(token) === index)
-                                            .map((token) => (
-                                                <div key={token} className="flex items-center justify-between gap-3 rounded-xl border border-cyan-100 bg-white px-4 py-3 text-sm">
-                                                    <span className="font-mono text-cyan-950">{token}</span>
-                                                    <button type="button" onClick={() => handleCopyToken(token)} className="rounded-lg border border-cyan-200 px-3 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-50">
-                                                        Copy
-                                                    </button>
+                                        <>
+                                            <div className="space-y-2">
+                                                {inviteTokens.map((entry) => (
+                                                    <div key={entry.token} className="flex flex-col gap-3 rounded-xl border border-cyan-100 bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                                                        <div>
+                                                            <div className="font-mono text-cyan-950">{entry.token}</div>
+                                                            <div className="mt-1 text-xs text-slate-500">
+                                                                {entry.used ? `Used by ${entry.usedBy || 'another voter'}` : 'Unused and available'}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <button type="button" onClick={() => handleCopyToken(entry.token)} className="rounded-lg border border-cyan-200 px-3 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-50">
+                                                                Copy
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRevokeInvite(entry.token)}
+                                                                disabled={entry.used}
+                                                                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                Revoke
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {generatedTokens.length > 0 && (
+                                                <div className="rounded-xl border border-dashed border-cyan-200 bg-cyan-50 px-4 py-3 text-xs text-cyan-900">
+                                                    Recent session tokens: {generatedTokens.join(', ')}
+                                                </div>
+                                            )}
+
+                                            <div className="flex flex-wrap gap-2 pt-2">
+                                                <button type="button" onClick={handleExportInvitesCsv} className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 px-3 py-2 text-xs font-semibold text-cyan-800 hover:bg-cyan-50">
+                                                    <Download className="h-3.5 w-3.5" />
+                                                    Export invites CSV
+                                                </button>
+                                                <button type="button" onClick={handleExportSnapshot} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-white">
+                                                    <Archive className="h-3.5 w-3.5" />
+                                                    Export snapshot JSON
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Operational snapshot</p>
+                                            <p className="mt-1 text-sm text-slate-600">Live election state, ready for archival or rollback.</p>
+                                        </div>
+                                        <Lock className="h-5 w-5 text-slate-400" />
+                                    </div>
+
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                        <div className="rounded-2xl bg-white p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Audit records</p>
+                                            <p className="mt-2 text-2xl font-bold text-slate-950">{auditLog.length}</p>
+                                        </div>
+                                        <div className="rounded-2xl bg-white p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Token records</p>
+                                            <p className="mt-2 text-2xl font-bold text-slate-950">{inviteTokens.length}</p>
+                                        </div>
+                                        <div className="rounded-2xl bg-white p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Open seats</p>
+                                            <p className="mt-2 text-2xl font-bold text-slate-950">{Math.max(candidates.length - totalVotes, 0)}</p>
+                                        </div>
+                                        <div className="rounded-2xl bg-white p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Activity feed</p>
+                                            <p className="mt-2 text-2xl font-bold text-slate-950">{activityFeed.length}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Admin activity</p>
+                                            <p className="mt-1 text-sm text-slate-600">Recent operational actions and client-side errors.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivityFeed(loadClientObservability())}
+                                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-white"
+                                        >
+                                            Refresh
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-4 space-y-2">
+                                        {activityFeed.length === 0 ? (
+                                            <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">No recorded operational events yet.</p>
+                                        ) : (
+                                            activityFeed.slice(0, 6).map((entry) => (
+                                                <div key={entry.id} className={`rounded-xl border px-4 py-3 text-sm ${entry.type === 'error' ? 'border-rose-200 bg-rose-50 text-rose-900' : entry.type.startsWith('admin:') ? 'border-cyan-200 bg-cyan-50 text-cyan-950' : 'border-slate-200 bg-white text-slate-700'}`}>
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="font-semibold">{entry.message}</div>
+                                                            <div className="mt-1 text-xs uppercase tracking-[0.2em] opacity-70">{entry.type}</div>
+                                                        </div>
+                                                        <div className="text-xs text-slate-500">{formatClientTimestamp(entry.timestamp)}</div>
+                                                    </div>
                                                 </div>
                                             ))
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

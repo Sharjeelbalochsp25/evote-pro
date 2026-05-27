@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import PublicLayout from './components/PublicLayout';
 import CreatorLayout from './components/CreatorLayout';
 import Landing from './pages/Landing';
@@ -15,8 +15,9 @@ import VoteElection from './pages/Public/VoteElection';
 import { useVote, VoteProvider } from './context/ElectionContext';
 import { useAuth } from './context/AuthContext';
 import { AuthProvider } from './context/AuthContext';
-import { deploymentDiagnostics, firebaseDiagnostics, hasDemoMode } from './firebase';
+import { deploymentDiagnostics, firebaseDiagnostics, hasDemoMode, trackAnalyticsEvent } from './firebase';
 import { AppErrorBoundary, RouteErrorBoundary } from './components/ErrorBoundary';
+import { recordClientError, recordClientEvent } from './utils/clientObservability';
 
 const FirebaseFatalScreen = () => {
     const missingList = firebaseDiagnostics.missing.map((key) => `- ${key}`).join('\n');
@@ -93,6 +94,49 @@ function AppContent() {
 }
 
 function App() {
+    useEffect(() => {
+        recordClientEvent('app', 'Application mounted', {
+            deploymentEnv: deploymentDiagnostics.deploymentEnv,
+            host: deploymentDiagnostics.host,
+            projectId: deploymentDiagnostics.projectId,
+        });
+
+        void trackAnalyticsEvent('app_mount', {
+            deployment_env: deploymentDiagnostics.deploymentEnv,
+            project_id: deploymentDiagnostics.projectId,
+        });
+
+        const handleError = (event) => {
+            recordClientError('window.error', event.error || new Error(event.message || 'Window error'), {
+                filename: event.filename || '',
+                lineno: String(event.lineno || ''),
+                colno: String(event.colno || ''),
+            });
+
+            void trackAnalyticsEvent('frontend_error', {
+                source: 'window.error',
+                filename: event.filename || '',
+            });
+        };
+
+        const handleRejection = (event) => {
+            const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason || 'Unhandled rejection'));
+            recordClientError('window.unhandledrejection', reason);
+
+            void trackAnalyticsEvent('frontend_error', {
+                source: 'window.unhandledrejection',
+            });
+        };
+
+        window.addEventListener('error', handleError);
+        window.addEventListener('unhandledrejection', handleRejection);
+
+        return () => {
+            window.removeEventListener('error', handleError);
+            window.removeEventListener('unhandledrejection', handleRejection);
+        };
+    }, []);
+
     if (!firebaseDiagnostics.valid && !hasDemoMode) {
         return <FirebaseFatalScreen />;
     }

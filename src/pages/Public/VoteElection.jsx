@@ -7,11 +7,14 @@ import { AlertTriangle, ArrowRight, BadgeCheck, CheckCircle2, ShieldCheck, Vote 
 import { firebaseClientConfig, hasDemoMode, hasFirebaseConfig } from '../../firebase';
 import { DEFAULT_VERIFICATION_METHOD, VERIFICATION_METHODS } from '../../context/ElectionContext';
 import { classifyFirebaseError } from '../../utils/firebaseErrors';
+import { formatClientTimestamp, maskInviteToken, recordClientError, recordClientEvent } from '../../utils/clientObservability';
+import { trackAnalyticsEvent } from '../../firebase';
 
 const getVerificationConfig = (method) => VERIFICATION_METHODS.find((item) => item.value === method) || DEFAULT_VERIFICATION_METHOD;
 const LOCAL_STORAGE_KEY = 'electionSystemsV2';
 const PUBLIC_VOTE_IDENTITY_KEY = 'publicVoteIdentityV1';
 const PUBLIC_VOTE_APP_NAME = 'public-vote-session';
+const OFFLINE_VOTE_MESSAGE = 'You are offline. Reconnect and retry your vote.';
 
 const getPublicVoteServices = () => {
     const publicApp = getApps().find((item) => item.name === PUBLIC_VOTE_APP_NAME) || initializeApp(firebaseClientConfig, PUBLIC_VOTE_APP_NAME);
@@ -199,8 +202,28 @@ const VoteElection = () => {
     const [tokenInput, setTokenInput] = useState('');
     const [identityState, setIdentityState] = useState('idle'); // idle | validating | valid | used
     const [identityLoading, setIdentityLoading] = useState(false);
+    const [voteReceipt, setVoteReceipt] = useState(null);
+    const [isOnline, setIsOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+    const [publicAuthReady, setPublicAuthReady] = useState(false);
+    const [showRetryVote, setShowRetryVote] = useState(false);
     const showDemoFallback = hasDemoMode;
     const publicVoteServices = hasFirebaseConfig ? getPublicVoteServices() : null;
+    const readyForE2E = Boolean(election && !loading && (showDemoFallback || !hasFirebaseConfig || publicAuthReady));
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     useEffect(() => {
         if (!publicCode) {
@@ -256,6 +279,37 @@ const VoteElection = () => {
     }, [publicCode, publicVoteServices?.db]);
 
     useEffect(() => {
+        let cancelled = false;
+
+        if (showDemoFallback || !hasFirebaseConfig || !publicVoteServices?.auth) {
+            setPublicAuthReady(true);
+            return undefined;
+        }
+
+        const initializeAnonymousSession = async () => {
+            try {
+                const publicAuth = publicVoteServices.auth;
+                await (publicAuth.currentUser ? Promise.resolve(publicAuth.currentUser) : signInAnonymously(publicAuth));
+                if (!cancelled) {
+                    setPublicAuthReady(true);
+                }
+            } catch (sessionError) {
+                if (!cancelled) {
+                    setPublicAuthReady(false);
+                    setError(classifyFirebaseError(sessionError, 'Unable to initialize secure voting session.'));
+                }
+                recordClientError('public-vote.initializeSession', sessionError, { publicCode });
+            }
+        };
+
+        void initializeAnonymousSession();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [showDemoFallback, publicCode, publicVoteServices?.auth]);
+
+    useEffect(() => {
         const storedToken = getStoredInviteToken(publicCode);
         if (!storedToken) return;
 
@@ -271,6 +325,7 @@ const VoteElection = () => {
     }, [publicCode, election?.id]);
 
     const candidates = election?.ballotCandidates || election?.candidates || [];
+    const selectedCandidateRecord = candidates.find((candidate) => Number(candidate.id) === Number(selectedCandidate)) || null;
     const boothReady = candidates.length > 0;
     const canSubmitVote = Boolean(inviteToken && identityState === 'valid' && boothReady && election?.isActive !== false);
 
@@ -281,7 +336,14 @@ const VoteElection = () => {
             return { success: false };
         }
 
+        if (!isOnline) {
+            setIdentityState('idle');
+            if (!silent) setError(OFFLINE_VOTE_MESSAGE);
+            return { success: false };
+        }
+
         setIdentityLoading(true);
+        setIdentityState('validating');
         if (!silent) setError('');
 
         if (showDemoFallback || !hasFirebaseConfig || !publicVoteServices?.db) {
@@ -292,6 +354,10 @@ const VoteElection = () => {
                 clearStoredInviteToken(publicCode);
                 setIdentityState('idle');
                 if (!silent) setError('Invalid invite token for this election.');
+                recordClientEvent('public-vote:token-invalid', 'Rejected invite token during local validation', {
+                    publicCode,
+                    inviteToken: maskInviteToken(normalizedToken),
+                });
                 setIdentityLoading(false);
                 return { success: false };
             }
@@ -300,6 +366,10 @@ const VoteElection = () => {
                 clearStoredInviteToken(publicCode);
                 setIdentityState('used');
                 if (!silent) setError('This invite token has already been used.');
+                recordClientEvent('public-vote:token-used', 'Local invite token had already been used', {
+                    publicCode,
+                    inviteToken: maskInviteToken(normalizedToken),
+                });
                 setIdentityLoading(false);
                 return { success: false };
             }
@@ -307,7 +377,15 @@ const VoteElection = () => {
             setInviteToken(normalizedToken);
             setTokenInput(normalizedToken);
             setIdentityState('valid');
+            setShowRetryVote(false);
             setStoredInviteToken(publicCode, normalizedToken);
+            recordClientEvent('public-vote:token-validated', 'Local invite token accepted', {
+                publicCode,
+                inviteToken: maskInviteToken(normalizedToken),
+            });
+            void trackAnalyticsEvent('public_vote_token_validated', {
+                public_code: publicCode,
+            });
             setIdentityLoading(false);
             return { success: true };
         }
@@ -324,6 +402,9 @@ const VoteElection = () => {
                 clearStoredInviteToken(publicCode);
                 setIdentityState('idle');
                 if (!silent) setError('Election not found or code is invalid.');
+                recordClientEvent('public-vote:election-missing', 'Election lookup failed during token validation', {
+                    publicCode,
+                });
                 setIdentityLoading(false);
                 return { success: false };
             }
@@ -331,6 +412,9 @@ const VoteElection = () => {
             const electionData = publicElectionSnap.data() || {};
             if (electionData.isActive === false) {
                 if (!silent) setError('This election is closed.');
+                recordClientEvent('public-vote:election-closed', 'Token validation blocked because the election is closed', {
+                    publicCode,
+                });
                 setIdentityLoading(false);
                 return { success: false };
             }
@@ -339,6 +423,10 @@ const VoteElection = () => {
                 clearStoredInviteToken(publicCode);
                 setIdentityState('idle');
                 if (!silent) setError('Invalid invite token for this election.');
+                recordClientEvent('public-vote:token-invalid', 'Rejected invite token during Firestore validation', {
+                    publicCode,
+                    inviteToken: maskInviteToken(normalizedToken),
+                });
                 setIdentityLoading(false);
                 return { success: false };
             }
@@ -348,6 +436,10 @@ const VoteElection = () => {
                 clearStoredInviteToken(publicCode);
                 setIdentityState('idle');
                 if (!silent) setError('Invite token is not valid for this election.');
+                recordClientEvent('public-vote:token-mismatch', 'Invite token pointed to a different election', {
+                    publicCode,
+                    inviteToken: maskInviteToken(normalizedToken),
+                });
                 setIdentityLoading(false);
                 return { success: false };
             }
@@ -358,6 +450,10 @@ const VoteElection = () => {
                 setIdentityState('used');
                 setStoredInviteToken(publicCode, normalizedToken);
                 if (!silent) setError('This invite token has already been used.');
+                recordClientEvent('public-vote:token-used', 'Firestore invite token had already been used', {
+                    publicCode,
+                    inviteToken: maskInviteToken(normalizedToken),
+                });
                 setIdentityLoading(false);
                 return { success: false };
             }
@@ -365,7 +461,15 @@ const VoteElection = () => {
             setInviteToken(normalizedToken);
             setTokenInput(normalizedToken);
             setIdentityState('valid');
+            setShowRetryVote(false);
             setStoredInviteToken(publicCode, normalizedToken);
+            recordClientEvent('public-vote:token-validated', 'Firestore invite token accepted', {
+                publicCode,
+                inviteToken: maskInviteToken(normalizedToken),
+            });
+            void trackAnalyticsEvent('public_vote_token_validated', {
+                public_code: publicCode,
+            });
             setIdentityLoading(false);
             return { success: true };
         } catch (inviteError) {
@@ -376,6 +480,7 @@ const VoteElection = () => {
                 const message = classifyFirebaseError(inviteError, 'Unable to validate invite token.');
                 setError(message);
             }
+            recordClientError('public-vote.validateInviteToken', inviteError, { publicCode });
             return { success: false };
         }
     };
@@ -385,8 +490,14 @@ const VoteElection = () => {
         await validateInviteToken(tokenInput, false);
     };
 
-    const handleVote = async (event) => {
-        event.preventDefault();
+    const submitVote = async () => {
+        const currentlyOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+
+        if (!currentlyOnline) {
+            setError(`Failed to cast vote: ${OFFLINE_VOTE_MESSAGE}`);
+            setShowRetryVote(true);
+            return;
+        }
 
         if (!inviteToken || identityState !== 'valid') {
             setError('Enter a valid invite token before voting.');
@@ -410,10 +521,32 @@ const VoteElection = () => {
                     candidateId: selectedCandidate,
                     inviteToken,
                 });
+                const nextReceipt = {
+                    ...localResult,
+                    candidateId: selectedCandidate,
+                    candidateName: selectedCandidateRecord?.name || 'Selected candidate',
+                    candidateParty: selectedCandidateRecord?.party || '',
+                    inviteToken: maskInviteToken(inviteToken),
+                    votedAt: new Date().toISOString(),
+                    mode: 'local',
+                };
+
+                setVoteReceipt(nextReceipt);
                 setVoteResult(localResult);
+                setShowRetryVote(false);
+                recordClientEvent('public-vote:submitted', 'Local public vote recorded', {
+                    publicCode,
+                    candidateId: String(selectedCandidate),
+                });
+                void trackAnalyticsEvent('public_vote_submitted', {
+                    public_code: publicCode,
+                    mode: 'local',
+                });
                 return;
             } catch (localError) {
+                recordClientError('public-vote.localVote', localError, { publicCode, candidateId: String(selectedCandidate) });
                 setError(localError?.message || 'Voting is not configured in this environment.');
+                setShowRetryVote(true);
                 return;
             }
         }
@@ -474,9 +607,19 @@ const VoteElection = () => {
                 }
 
                 const candidateRef = doc(publicDb, 'users', ownerId, 'elections', electionId, 'candidates', String(selectedCandidate));
+                const candidateSnap = await transaction.get(candidateRef);
+
+                if (!candidateSnap.exists()) {
+                    throw new Error('Selected candidate is no longer available.');
+                }
+
+                const candidateData = candidateSnap.data() || {};
+
                 const voterRef = doc(publicDb, 'users', ownerId, 'elections', electionId, 'voters', voteToken);
                 const auditRef = doc(publicDb, 'users', ownerId, 'elections', electionId, 'auditLog', voteToken);
-                transaction.update(inviteRef, {
+
+                transaction.set(inviteRef, {
+                    ...inviteData,
                     used: true,
                     usedBy: voteToken,
                     usedAt: serverTimestamp(),
@@ -501,20 +644,42 @@ const VoteElection = () => {
                     electionId,
                     timestamp: serverTimestamp(),
                 });
-                transaction.update(candidateRef, {
-                    votes: increment(1),
+
+                transaction.set(candidateRef, {
+                    ...candidateData,
+                    votes: (candidateData.votes || 0) + 1,
                     updatedAt: serverTimestamp(),
                 });
 
                 return { transactionId: voteToken, candidateId: selectedCandidate };
             });
 
-            setVoteResult({
-                success: true,
+            const nextReceipt = {
                 transactionId: result?.transactionId || voteToken,
                 candidateId: result?.candidateId || selectedCandidate,
+                candidateName: selectedCandidateRecord?.name || 'Selected candidate',
+                candidateParty: selectedCandidateRecord?.party || '',
+                inviteToken: maskInviteToken(inviteToken),
+                votedAt: new Date().toISOString(),
+                mode: 'firebase',
+            };
+
+            setVoteReceipt(nextReceipt);
+            setVoteResult({
+                success: true,
+                transactionId: nextReceipt.transactionId,
+                candidateId: nextReceipt.candidateId,
             });
             setIdentityState('used');
+            setShowRetryVote(false);
+            recordClientEvent('public-vote:submitted', 'Firestore public vote recorded', {
+                publicCode,
+                candidateId: String(selectedCandidate),
+            });
+            void trackAnalyticsEvent('public_vote_submitted', {
+                public_code: publicCode,
+                mode: 'firebase',
+            });
         } catch (voteError) {
             const message = voteError?.message || voteError?.details || 'Failed to cast vote.';
             const normalizedMessage = typeof message === 'string' ? message.replace(/^internal\s*/i, '').trim() : 'Failed to cast vote.';
@@ -528,11 +693,13 @@ const VoteElection = () => {
                     const outcome = await resolveVoteFailureState({ publicDb, publicCode, inviteToken, voterUid });
                     if (outcome?.kind === 'already-voted' || outcome?.kind === 'token-used' || outcome?.kind === 'invalid-token') {
                         setError(outcome.message);
+                        setShowRetryVote(false);
                         return;
                     }
 
                     if (outcome?.kind === 'transient-retry') {
                         setError(outcome.message);
+                        setShowRetryVote(true);
                         return;
                     }
                 }
@@ -540,17 +707,31 @@ const VoteElection = () => {
                 // Fall through to the generic classified error below.
             }
 
+            recordClientError('public-vote.handleVote', voteError, {
+                publicCode,
+                candidateId: String(selectedCandidate),
+            });
             setError(classifyFirebaseError(voteError, normalizedMessage));
+            setShowRetryVote(true);
         } finally {
             setSubmitting(false);
         }
     };
 
+    const handleVote = async (event) => {
+        event.preventDefault();
+        await submitVote();
+    };
+
     if (loading) {
         return (
             <div className="mx-auto flex min-h-[calc(100vh-9rem)] max-w-3xl items-center px-4 py-16 text-center sm:px-6 lg:px-8">
-                <div className="w-full rounded-[2rem] border border-white/10 bg-white/5 p-8 text-slate-200 backdrop-blur-xl">
-                    Loading election...
+                <div className="w-full rounded-[2rem] border border-white/10 bg-white/5 p-8 text-left text-slate-200 shadow-2xl backdrop-blur-xl sm:p-10">
+                    <p className="text-sm uppercase tracking-[0.24em] text-cyan-200/80">Public voting</p>
+                    <h1 className="mt-3 text-3xl font-semibold text-white">Loading ballot details</h1>
+                    <p className="mt-3 max-w-xl text-sm leading-7 text-slate-300">
+                        We are checking the live election record, invite token gate, and current ballot state before you vote.
+                    </p>
                 </div>
             </div>
         );
@@ -565,9 +746,25 @@ const VoteElection = () => {
                     </div>
                     <h1 className="text-3xl font-semibold text-white">Vote recorded</h1>
                     <p className="mt-3 text-slate-300">Your ballot was submitted for {election?.title || 'this election'}.</p>
-                    <div className="mx-auto mt-8 max-w-md rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-left">
-                        <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Transaction ID</div>
-                        <div className="mt-2 font-mono text-lg text-white">{voteResult.transactionId}</div>
+                    <div className="mx-auto mt-8 grid max-w-2xl gap-4 rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-left sm:grid-cols-2">
+                        <div>
+                            <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Candidate</div>
+                            <div className="mt-2 text-lg font-semibold text-white">{voteReceipt?.candidateName || 'Selected candidate'}</div>
+                            <div className="mt-1 text-sm text-slate-400">{voteReceipt?.candidateParty || 'Independent'}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Invite token</div>
+                            <div className="mt-2 font-mono text-lg text-white">{voteReceipt?.inviteToken || maskInviteToken(inviteToken)}</div>
+                            <div className="mt-1 text-sm text-slate-400">Validated before submission</div>
+                        </div>
+                        <div>
+                            <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Transaction ID</div>
+                            <div className="mt-2 font-mono text-lg text-white">{voteResult.transactionId}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Recorded at</div>
+                            <div className="mt-2 text-lg text-white">{formatClientTimestamp(voteReceipt?.votedAt)}</div>
+                        </div>
                     </div>
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
                         <button
@@ -598,6 +795,22 @@ const VoteElection = () => {
                         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">{election?.description || 'Enter your election invite token, then choose one candidate to cast your vote securely.'}</p>
                     </div>
 
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        {[
+                            { label: '1. Validate token', state: identityState === 'valid' || identityState === 'used' ? 'complete' : identityLoading ? 'active' : 'idle' },
+                            { label: '2. Choose candidate', state: selectedCandidate ? 'complete' : 'idle' },
+                            { label: '3. Submit ballot', state: canSubmitVote ? 'active' : 'idle' },
+                        ].map((step) => (
+                            <div
+                                key={step.label}
+                                className={`rounded-2xl border p-4 text-sm transition ${step.state === 'complete' ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-50' : step.state === 'active' ? 'border-cyan-300/30 bg-cyan-400/10 text-cyan-50' : 'border-white/10 bg-slate-950/60 text-slate-300'}`}
+                            >
+                                <div className="font-semibold">{step.label}</div>
+                                <div className="mt-1 text-xs uppercase tracking-[0.24em] opacity-70">{step.state === 'complete' ? 'Ready' : step.state === 'active' ? 'Now' : 'Pending'}</div>
+                            </div>
+                        ))}
+                    </div>
+
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
                             <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Election code</div>
@@ -605,16 +818,33 @@ const VoteElection = () => {
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
                             <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Invite token</div>
-                            <div className="mt-2 text-white">{identityState === 'valid' ? inviteToken : 'Required before voting'}</div>
+                            <div className="mt-2 text-white">{identityState === 'valid' ? maskInviteToken(inviteToken) : 'Required before voting'}</div>
                         </div>
                     </div>
 
                     {error && (
-                        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-rose-200">
+                        <div data-testid="vote-error" className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-rose-200">
                             <div className="flex items-start gap-3">
                                 <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
                                 <p className="text-sm">{error}</p>
                             </div>
+                            {showRetryVote && (
+                                <button
+                                    type="button"
+                                    data-testid="retry-vote"
+                                    onClick={() => void submitVote()}
+                                    disabled={submitting}
+                                    className="mt-3 inline-flex items-center justify-center rounded-xl border border-rose-300/40 bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    Retry vote
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {!isOnline && (
+                        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-amber-100">
+                            {OFFLINE_VOTE_MESSAGE}
                         </div>
                     )}
 
@@ -675,9 +905,12 @@ const VoteElection = () => {
                     </div>
 
                     <form onSubmit={handleTokenSubmit} className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+                        {readyForE2E && <div id="public-vote-ready" data-ready="true" aria-hidden="true" style={{ display: 'none' }} />}
                         <div>
-                            <label className="mb-2 block text-sm font-medium text-slate-200">Invite token</label>
+                            <label htmlFor="inviteToken" className="mb-2 block text-sm font-medium text-slate-200">Invite token</label>
                             <input
+                                id="inviteToken"
+                                name="inviteToken"
                                 value={tokenInput}
                                 onChange={(event) => {
                                     setTokenInput(event.target.value.toUpperCase().trim());
@@ -706,6 +939,7 @@ const VoteElection = () => {
                                 {identityState === 'used' && 'This token has already been used in this election.'}
                                 {identityState === 'idle' && 'Enter your invite token to unlock the ballot.'}
                                 {identityState === 'validating' && 'Checking token against Firestore...'}
+                                {!identityLoading && identityState === 'valid' && selectedCandidate ? 'Ballot ready. Review your selection before submitting.' : ''}
                             </div>
                         </div>
 

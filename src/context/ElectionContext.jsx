@@ -14,6 +14,8 @@ import {
 import { auth, db, hasDemoMode, hasFirebaseConfig } from '../firebase';
 import { useAuth } from './AuthContext';
 import { classifyFirebaseError, withRetry } from '../utils/firebaseErrors';
+import { maskInviteToken, recordClientError, recordClientEvent } from '../utils/clientObservability';
+import { trackAnalyticsEvent } from '../firebase';
 
 const VoteContext = createContext();
 
@@ -216,6 +218,32 @@ export const VoteProvider = ({ children }) => {
     };
 
     const activeElection = elections.find((election) => election.id === activeElectionId) || null;
+
+    const logOperationalEvent = (type, message, details = {}) => {
+        const contextualDetails = {
+            userId: currentUser?.id || '',
+            electionId: activeElectionId || '',
+            electionTitle: activeElection?.title || '',
+            ...details,
+        };
+
+        recordClientEvent(type, message, contextualDetails);
+        void trackAnalyticsEvent(type.replace(/[^a-z0-9]+/gi, '_').toLowerCase(), contextualDetails);
+    };
+
+    const logOperationalError = (action, error, details = {}) => {
+        recordClientError(`ElectionContext.${action}`, error, {
+            userId: currentUser?.id || '',
+            electionId: activeElectionId || '',
+            ...details,
+        });
+
+        void trackAnalyticsEvent('admin_action_error', {
+            action,
+            user_id: currentUser?.id || '',
+            election_id: activeElectionId || '',
+        });
+    };
 
     useEffect(() => {
         if (!firebaseEnabled) {
@@ -493,6 +521,10 @@ export const VoteProvider = ({ children }) => {
             setAuditLog([]);
             saveLocalElectionList(nextElections, electionId);
             saveLocalStateForElection(electionId, () => emptyElectionData);
+            logOperationalEvent('admin:create-election', `Created election "${title}"`, {
+                electionId,
+                publicCode,
+            });
             return { success: true, election };
         }
 
@@ -528,6 +560,10 @@ export const VoteProvider = ({ children }) => {
             setBackendError('');
 
             setActiveElectionId(electionDocRef.id);
+            logOperationalEvent('admin:create-election', `Created election "${title}"`, {
+                electionId: electionDocRef.id,
+                publicCode,
+            });
             return {
                 success: true,
                 election: {
@@ -544,6 +580,7 @@ export const VoteProvider = ({ children }) => {
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to create election.');
             setBackendError(message);
+            logOperationalError('createElection', error, { title });
             return { success: false, error: message };
         }
     };
@@ -778,10 +815,14 @@ export const VoteProvider = ({ children }) => {
 
             await withRetry(() => batch.commit(), { attempts: 3, baseDelayMs: 400 });
             setBackendError('');
+            logOperationalEvent('admin:reset-election', 'Reset election vote totals and logs', {
+                electionId: activeElectionId,
+            });
             return { success: true };
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to reset election.');
             setBackendError(message);
+            logOperationalError('resetElection', error, { electionId: activeElectionId });
             return { success: false, error: message };
         }
     };
@@ -813,10 +854,15 @@ export const VoteProvider = ({ children }) => {
             }
 
             setBackendError('');
+            logOperationalEvent(closed ? 'admin:close-election' : 'admin:open-election', `${closed ? 'Closed' : 'Opened'} election`, {
+                electionId,
+                publicCode,
+            });
             return { success: true };
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to update election state.');
             setBackendError(message);
+            logOperationalError('finishElection', error, { electionId, closed });
             return { success: false, error: message };
         }
     };
@@ -869,11 +915,16 @@ export const VoteProvider = ({ children }) => {
             setElections(nextElections);
             if (activeElectionId === electionId) setActiveElectionId(nextElections[0]?.id || null);
             setBackendError('');
+            logOperationalEvent('admin:delete-election', 'Deleted election and associated records', {
+                electionId,
+                publicCode,
+            });
 
             return { success: true };
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to delete election.');
             setBackendError(message);
+            logOperationalError('deleteElection', error, { electionId });
             return { success: false, error: message };
         }
     };
@@ -929,10 +980,15 @@ export const VoteProvider = ({ children }) => {
             }
 
             setBackendError('');
+            logOperationalEvent('admin:add-candidate', `Added candidate ${name}`, {
+                candidateId: nextId,
+                publicCode,
+            });
             return candidateRecord;
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to add candidate.');
             setBackendError(message);
+            logOperationalError('addCandidate', error, { candidateName: name });
             return { success: false, error: message };
         }
     };
@@ -973,9 +1029,14 @@ export const VoteProvider = ({ children }) => {
             }
 
             setBackendError('');
+            logOperationalEvent('admin:remove-candidate', `Removed candidate ${id}`, {
+                candidateId: id,
+                publicCode,
+            });
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to remove candidate.');
             setBackendError(message);
+            logOperationalError('removeCandidate', error, { candidateId: id });
             return { success: false, error: message };
         }
     };
@@ -1028,10 +1089,15 @@ export const VoteProvider = ({ children }) => {
 
             await withRetry(() => batch.commit(), { attempts: 3, baseDelayMs: 300 });
             setBackendError('');
+            logOperationalEvent('admin:generate-invites', `Generated ${tokens.length} invite tokens`, {
+                tokenCount: tokens.length,
+                publicCode,
+            });
             return { success: true, tokens };
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to generate invite tokens.');
             setBackendError(message);
+            logOperationalError('generateInviteTokens', error, { tokenCount: inviteCount });
             return { success: false, error: message };
         }
     };
@@ -1058,10 +1124,15 @@ export const VoteProvider = ({ children }) => {
 
             await withRetry(() => deleteDoc(doc(db, PUBLIC_ELECTIONS_COLLECTION, publicCode, 'invites', normalizedToken)), { attempts: 3, baseDelayMs: 300 });
             setBackendError('');
+            logOperationalEvent('admin:revoke-invite', 'Revoked invite token', {
+                token: maskInviteToken(normalizedToken),
+                publicCode,
+            });
             return { success: true };
         } catch (error) {
             const message = classifyFirebaseError(error, 'Failed to revoke invite token.');
             setBackendError(message);
+            logOperationalError('revokeInviteToken', error, { token: normalizedToken });
             return { success: false, error: message };
         }
     };

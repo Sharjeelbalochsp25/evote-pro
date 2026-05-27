@@ -1,36 +1,27 @@
 # Release Notes
 
-## Summary
+## Release Candidate Status
 
-This release stabilizes the app on a Firebase-first deployment path and records the current production-ready vote flow.
+Current release status: RELEASE CANDIDATE / GO
 
-## What Changed
+This release locks the production vote flow to Firebase-only hosting, Firestore, and Firebase Auth. The public ballot path is transaction-based, duplicate-resistant, and validated by Playwright plus emulator checks.
 
-- Migrated the live deployment away from the mixed Vercel/Firebase shape and aligned Hosting with the current Firebase build output.
-- Removed the demo fallback from the live voting flow so production users go through the Firestore-backed path.
-- Standardized public voting on Firestore-only transactions instead of the deprecated Cloud Function vote submission path.
-- Preserved token-bound voting by tying each vote to an invite token and the anonymous Firebase Auth UID used during submission.
-- Kept the creator-side election management and live vote ledger on the Firebase stack.
+## Highlights
 
-## Production Readiness
+- Firebase-only public voting path is now the production route
+- Anonymous Firebase Auth remains the voter identity layer
+- Invite token redemption is single-use and transaction-safe
+- Receipt rendering, duplicate prevention, and retry handling are covered by E2E tests
+- Diagnostics retention is enabled for Playwright failures
 
-- Hosting now serves the current `dist` bundle from Firebase Hosting.
-- The live vote page uses the Firestore transaction flow and no longer references `castPublicVoteSecure` or `httpsCallable` in the deployed asset.
-- Anonymous Firebase Auth remains the public voter identity layer.
-- Invite token consumption, voter recording, audit logging, and candidate incrementing were verified on the live deployment.
+## Validation
 
-## Notes for Operators
+- 12/12 Playwright tests passed
+- Emulator integrity checks confirmed invite redemption, voter writes, audit writes, and candidate tallies
+
+## Operator Notes
 
 - Firebase project: `evotepro-7deff`
 - Hosting URL: `https://evotepro-7deff.web.app`
-- Current deployed asset: `index-DNSy6DtH.js`
-
-## Rollback
-
-If the release must be reverted, check out the release tag, rebuild, and redeploy Hosting.
-
-```bash
-git checkout <release-tag>
-npm run build
-npx firebase-tools deploy --only hosting --project evotepro-7deff
-```
+- Production build: `npm run build`
+- Deploy: `npm run deploy:firebase`

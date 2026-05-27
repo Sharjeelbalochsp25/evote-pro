@@ -86,13 +86,14 @@ service cloud.firestore {
         allow delete: if isOwner(uid);
 
         match /candidates/{candidateId} {
-          allow read: if isOwner(uid);
+          allow read: if isOwner(uid)
+            || (isAnonymous() && publicElectionLinked(uid, electionId));
           allow create: if isOwner(uid)
             && request.resource.data.votes is int
             && request.resource.data.votes == 0;
           allow update: if isOwner(uid)
             && request.resource.data.votes == resource.data.votes;
-          allow update: if isAnonymous()
+          allow update: if signedIn()
             && request.resource.data.keys().hasOnly(['id', 'name', 'party', 'votes', 'createdAt', 'updatedAt'])
             && request.resource.data.id == resource.data.id
             && request.resource.data.name == resource.data.name
@@ -107,7 +108,7 @@ service cloud.firestore {
         match /voters/{voterId} {
           allow read: if isOwner(uid);
           allow create, update, delete: if isOwner(uid);
-          allow create: if isAnonymous()
+          allow create: if signedIn()
             && voterId == request.auth.uid
             && !exists(/databases/$(database)/documents/users/$(uid)/elections/$(electionId)/voters/$(voterId))
             && request.resource.data.keys().hasOnly(['inviteToken', 'authUid', 'candidateId', 'publicCode', 'electionId', 'hasVoted', 'votedAt'])
@@ -123,7 +124,7 @@ service cloud.firestore {
         match /auditLog/{logId} {
           allow read: if isOwner(uid);
           allow create, update, delete: if isOwner(uid);
-          allow create: if isAnonymous()
+          allow create: if signedIn()
             && logId == request.auth.uid
             && request.resource.data.keys().hasOnly(['id', 'inviteToken', 'voterHash', 'candidateId', 'publicCode', 'electionId', 'timestamp'])
             && request.resource.data.id == request.auth.uid
@@ -159,7 +160,7 @@ service cloud.firestore {
           && request.resource.data.publicCode == publicCode
           && request.resource.data.used == false
           && request.resource.data.usedBy == '';
-        allow update: if isAnonymous()
+        allow update: if signedIn()
           && exists(/databases/$(database)/documents/publicElections/$(publicCode))
           && get(/databases/$(database)/documents/publicElections/$(publicCode)).data.electionId == resource.data.electionId
           && resource.data.used == false
