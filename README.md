@@ -101,3 +101,7 @@ Backend package scripts:
 Current status: RELEASE CANDIDATE / GO
 
 The validated production path is Firebase-only, the public vote flow is operationally stable, and the current implementation is suitable for small-to-medium election workloads.
+
+## GitHub
+
+This project's source code and release tooling are hosted on GitHub. For the canonical repository URL, see the chat message accompanying this README.
