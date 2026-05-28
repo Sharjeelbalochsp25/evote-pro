@@ -10,8 +10,10 @@
     "prebuild": "npm run validate:firebase",
     "build": "npm run validate:firebase && vite build",
     "smoke:firebase": "node tools/firestoreSmokeTest.mjs",
+    "smoke:prod": "node tools/runSmoke.mjs",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
+    "release:check": "node tools/releaseVerificationChecklist.mjs",
     "test:e2e": "playwright test --config=playwright.config.mjs",
     "emulators:start": "npx firebase-tools emulators:start --project evotepro-7deff --only auth,firestore",
     "deploy:firebase": "npx firebase-tools deploy --only firestore:rules,hosting"
@@ -22,6 +24,7 @@
     "firebase": "^12.13.0",
     "firebase-admin": "^13.10.0",
     "firebase-functions": "^7.2.5",
+    "google-auth-library": "^9.0.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.344.0",

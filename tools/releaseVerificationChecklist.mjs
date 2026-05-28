@@ -27,12 +27,7 @@ function fail(message, details = '') {
 }
 
 function audit(line) {
-  try {
-    if (process.env.NO_AUDIT === '1' || process.env.NO_AUDIT === 'true') return;
-    fs.appendFileSync('DEPLOYMENT_AUDIT.md', `${new Date().toISOString()} ${line}\n`, 'utf8');
-  } catch (e) {
-    console.error('[release-check] audit write failed', e?.message || e);
-  }
+  fs.appendFileSync('DEPLOYMENT_AUDIT.md', `${new Date().toISOString()} ${line}\n`, 'utf8');
 }
 
 function loadCliToken() {

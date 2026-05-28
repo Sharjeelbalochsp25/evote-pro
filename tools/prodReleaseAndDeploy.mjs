@@ -16,11 +16,13 @@ function run(cmd, opts = {}) {
 }
 
 function audit(line) {
+  if (process.env.NO_AUDIT === '1') {
+    return;
+  }
   try {
-    if (process.env.NO_AUDIT === '1' || process.env.NO_AUDIT === 'true') return;
     fs.appendFileSync('DEPLOYMENT_AUDIT.md', `${new Date().toISOString()} ${line}\n`, 'utf8');
-  } catch (e) {
-    console.error('[prodReleaseAndDeploy] audit write failed', e?.message || e);
+  } catch (error) {
+    console.error('[release] audit write failed:', error?.message || error);
   }
 }
 
@@ -155,8 +157,10 @@ async function main() {
     stage('git tree is clean');
   }
 
-  if (releaseScriptDirty) {
+  if (releaseScriptDirty && !wrapperConfirmedAutoStash) {
     fail('tools/prodReleaseAndDeploy.mjs must be clean before auto-stash release can execute the original script directly');
+  } else if (releaseScriptDirty && wrapperConfirmedAutoStash) {
+    stage('release script is dirty, but the wrapper already confirmed a safe auto-stash copy');
   }
 
   stage('running npm install');
