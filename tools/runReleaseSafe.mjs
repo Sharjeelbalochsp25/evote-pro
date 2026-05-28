@@ -54,7 +54,7 @@ function copyIfExists(src, dest) {
 
 function isExcludedPath(relativePath) {
   const segments = relativePath.split(path.sep).filter(Boolean);
-  return segments.includes('.git') || segments.includes('node_modules') || segments.includes('deploy-artifacts') || segments.includes('.release-temp');
+  return segments.includes('node_modules') || segments.includes('deploy-artifacts') || segments.includes('.release-temp');
 }
 
 function copyWorkspaceMirror(sourceDir, destinationDir) {
@@ -76,7 +76,7 @@ function copyWorkspaceMirror(sourceDir, destinationDir) {
 
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === 'deploy-artifacts' || entry.name === '.release-temp') continue;
+      if (entry.name === 'node_modules' || entry.name === 'deploy-artifacts' || entry.name === '.release-temp') continue;
       const absolute = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         copiedDirs += 1;
@@ -305,7 +305,7 @@ function runChildWorkflow() {
   return result;
 }
 
-function main() {
+async function main() {
   log('AUTO-STASH', `mode=${dryRun ? 'dry-run' : 'release'}`);
   log('AUTO-STASH', `enabled=${autoStash}`);
 
@@ -415,11 +415,12 @@ function main() {
     if (go) {
       log('GO', 'release workflow completed successfully');
       audit('GO release_workflow_completed');
-    } else {
-      audit('NO-GO release_workflow_failed');
-      process.exit(1);
+      return;
     }
+
+    audit('NO-GO release_workflow_failed');
+    process.exit(1);
   }
 }
 
-main();
+await main();
