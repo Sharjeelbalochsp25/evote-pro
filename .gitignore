@@ -5,3 +5,6 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Deployment artifacts
+DEPLOYMENT_AUDIT.md
