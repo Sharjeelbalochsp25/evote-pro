@@ -8,3 +8,5 @@ dist/
 
 # Deployment artifacts
 DEPLOYMENT_AUDIT.md
+
+deploy-artifacts/
