@@ -104,7 +104,7 @@ The validated production path is Firebase-only, the public vote flow is operatio
 
 ## GitHub
 
-This project's source code and release tooling are hosted on GitHub. For the canonical repository URL, see the chat message accompanying this README.
+This project's source code and release tooling are hosted on GitHub. For the canonical repository URL, (https://github.com/Sharjeelbalochsp25/evote-pro).
 
 ## Screenshots
 
