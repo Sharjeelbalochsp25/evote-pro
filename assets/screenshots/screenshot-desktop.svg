@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#0ea5a3"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+    <style>
+      .bg{fill:#0f172a}
+      .card{fill:#0b1220;stroke:#0f172a;stroke-width:2}
+      .accent{fill:url(#g)}
+      .muted{fill:#94a3b8;font-family:Inter,Arial,sans-serif;font-size:14px}
+      .title{fill:#e6eef6;font-family:Inter,Arial,sans-serif;font-size:20px;font-weight:700}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="700" rx="8"/>
+  <rect x="48" y="48" width="1104" height="120" rx="8" class="card"/>
+  <rect x="48" y="192" width="760" height="420" rx="8" class="card"/>
+  <rect x="828" y="192" width="324" height="420" rx="8" class="card"/>
+  <rect x="72" y="72" width="220" height="72" rx="6" class="accent"/>
+  <text x="110" y="118" text-anchor="middle" class="title">E-VotePro</text>
+  <text x="100" y="156" class="muted">Secure public voting • Firebase Hosting</text>
+  <g transform="translate(100,260)">
+    <rect width="640" height="48" rx="6" fill="#071028"/>
+    <text x="12" y="32" class="muted">Invite token: •••• •••• ••••</text>
+    <rect x="0" y="80" width="640" height="360" rx="6" fill="#061827"/>
+    <text x="12" y="110" class="muted">Candidates list (example)</text>
+  </g>
+  <text x="840" y="240" class="muted">Status</text>
+  <rect x="840" y="260" width="280" height="60" rx="8" class="accent"/>
+  <text x="960" y="300" text-anchor="middle" class="title">Vote recorded</text>
+</svg>

@@ -105,3 +105,11 @@ The validated production path is Firebase-only, the public vote flow is operatio
 ## GitHub
 
 This project's source code and release tooling are hosted on GitHub. For the canonical repository URL, see the chat message accompanying this README.
+
+## Screenshots
+
+Here are example screenshots of the E-VotePro web app. These are illustrative snapshots of the public vote flow UI (desktop and mobile views).
+
+![E-VotePro Desktop Screenshot](assets/screenshots/screenshot-desktop.svg)
+
+![E-VotePro Mobile Screenshot](assets/screenshots/screenshot-mobile.svg)

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="780" viewBox="0 0 360 780">
+  <defs>
+    <linearGradient id="g2" x1="0" x2="1">
+      <stop offset="0" stop-color="#06b6d4"/>
+      <stop offset="1" stop-color="#0ea5a3"/>
+    </linearGradient>
+    <style>
+      .bg{fill:#0f172a}
+      .card{fill:#071026;stroke:#0f172a;stroke-width:1}
+      .accent{fill:url(#g2)}
+      .muted{fill:#9fb0c9;font-family:Inter,Arial,sans-serif;font-size:12px}
+      .title{fill:#e6eef6;font-family:Inter,Arial,sans-serif;font-size:16px;font-weight:700}
+    </style>
+  </defs>
+  <rect class="bg" width="360" height="780" rx="12"/>
+  <rect x="16" y="24" width="328" height="64" rx="8" class="card"/>
+  <rect x="16" y="104" width="328" height="560" rx="12" class="card"/>
+  <rect x="40" y="136" width="280" height="40" rx="8" class="accent"/>
+  <text x="180" y="164" text-anchor="middle" class="title">Invite token</text>
+  <text x="180" y="200" class="muted" text-anchor="middle">Validate token → Cast Vote</text>
+  <rect x="56" y="260" width="248" height="40" rx="8" fill="#061827"/>
+  <text x="180" y="286" text-anchor="middle" class="muted">E2E Candidate</text>
+  <rect x="56" y="340" width="248" height="40" rx="8" class="accent"/>
+  <text x="180" y="366" text-anchor="middle" class="title">Vote recorded</text>
+</svg>
